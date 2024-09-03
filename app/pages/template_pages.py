@@ -36,18 +36,9 @@ chain = prompt_template | llm | StrOutputParser()
 
 st.markdown("# Crea tu evaluación")
 
-country_selected = st.selectbox(
-    "Selecciona un país",
-    [
-        "Argentina",
-        "Brasil",
-        "Chile",
-        "Colombia",
-        "Ecuador",
-        "México",
-        "Perú",
-        "Venezuela",
-    ],
+country_selected = st.multiselect(
+    "Selecciona los países de los cuales quieres preguntar",
+    ["México", "Estados Unidos", "Canadá", "Brasil", "Argentina", "Chile"],
 )
 
 template_prompt_input = {
