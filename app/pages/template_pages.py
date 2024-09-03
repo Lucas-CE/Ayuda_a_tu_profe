@@ -54,6 +54,6 @@ template_prompt_input = {
     "country": country_selected,
 }
 
-respuesta_generada = chain.invoke(template_prompt_input)
-
-st.write("Respuesta generada:", respuesta_generada)
+if st.button("Generar pregunta"):
+    respuesta_generada = chain.invoke(template_prompt_input)
+    st.write("Respuesta generada:", respuesta_generada)
