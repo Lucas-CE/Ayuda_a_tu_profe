@@ -2,49 +2,38 @@ import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+
+# Configurar OpenAI
+
 import dotenv
 import os
 
-st.set_page_config(
-    page_title="Hello",
-    page_icon="👋",
-)
 
 dotenv.load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-llm = ChatOpenAI(openai_api_key=api_key, model="gpt-3.5-turbo")
+# Crear función para generar bibliografía
+def buscar_bibliografia(tema):
+    # Prompt para generar la bibliografía
+    prompt = f"Recomienda bibliografía académica sobre el tema '{tema}'."
+    
+    # Inicializar el modelo de ChatGPT
+    llm = ChatOpenAI(api_key=OPENAI_API_KEY, temperature=0.7)
 
-system_template_message = """
-You are a geography teacher.
-"""
+    # Procesar el prompt
+    response = llm(prompt)
+    
+    # Devolver el resultado
+    return response
 
-user_template_message = """
-What is the capital of {country}?
-"""
+# Interfaz en Streamlit
+st.title("Buscador de Bibliografía Académica")
+tema = st.text_input("Ingresa el tema que deseas estudiar (ej: probabilidades avanzadas):")
 
-prompt_template = ChatPromptTemplate.from_messages(
-    messages=[
-        ("system", system_template_message),
-        ("user", user_template_message),
-    ]
-)
-
-# El StrOutputParser se puede cambiar según el tipo de output que se espere
-chain = prompt_template | llm | StrOutputParser()
-
-
-st.markdown("# Crea tu evaluación")
-
-country_selected = st.multiselect(
-    "Selecciona los países de los cuales quieres preguntar",
-    ["México", "Estados Unidos", "Canadá", "Brasil", "Argentina", "Chile"],
-)
-
-template_prompt_input = {
-    "country": country_selected,
-}
-
-if st.button("Generar pregunta"):
-    respuesta_generada = chain.invoke(template_prompt_input)
-    st.write("Respuesta generada:", respuesta_generada)
+if st.button("Buscar"):
+    if tema:
+        bibliografia = buscar_bibliografia(tema)
+        st.write("Bibliografía recomendada:")
+        st.write(bibliografia)
+    else:
+        st.write("Por favor, ingresa un tema.")
