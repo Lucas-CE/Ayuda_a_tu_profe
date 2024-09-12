@@ -4,3 +4,5 @@ numpy
 langchain
 langchain-openai
 python-dotenv
+fpdf
+PyPDF2
