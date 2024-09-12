@@ -21,7 +21,7 @@ def buscar_bibliografia(tema):
     response = llm(prompt)
     
     # Devolver solo el contenido del mensaje
-    return response.content  # Cambiar a .content para obtener el texto
+    return response.content
 
 # Interfaz en Streamlit
 st.title("Buscador de Bibliografía Académica")
@@ -33,10 +33,10 @@ if st.button("Buscar"):
 
         st.write("### Bibliografía recomendada:")
         
-        # Dividir la bibliografía en líneas y enumerarlas
+        # Dividir la bibliografía en líneas y enumerarlas manualmente con st.markdown
         libros = bibliografia.split("\n")
         for i, libro in enumerate(libros, start=1):
             if libro.strip():  # Evitar mostrar líneas vacías
-                st.write(f"{i}. {libro.strip()}")
+                st.markdown(f"{i}. {libro.strip()}")
     else:
         st.write("Por favor, ingresa un tema.")
