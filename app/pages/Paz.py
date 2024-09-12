@@ -4,11 +4,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 # Configurar OpenAI
-
 import dotenv
 import os
-
-
 dotenv.load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -23,8 +20,8 @@ def buscar_bibliografia(tema):
     # Procesar el prompt
     response = llm(prompt)
     
-    # Devolver el resultado
-    return response
+    # Devolver solo el contenido del mensaje
+    return response.content
 
 # Interfaz en Streamlit
 st.title("Buscador de Bibliografía Académica")
@@ -33,7 +30,13 @@ tema = st.text_input("Ingresa el tema que deseas estudiar (ej: probabilidades av
 if st.button("Buscar"):
     if tema:
         bibliografia = buscar_bibliografia(tema)
-        st.write("Bibliografía recomendada:")
-        st.write(bibliografia)
+
+        st.write("### Bibliografía recomendada:")
+        
+        # Dividir la bibliografía en líneas y enumerarlas manualmente con st.markdown
+        libros = bibliografia.split("\n")
+        for i, libro in enumerate(libros, start=1):
+            if libro.strip():  # Evitar mostrar líneas vacías
+                st.markdown(f"{i}. {libro.strip()}")
     else:
         st.write("Por favor, ingresa un tema.")
