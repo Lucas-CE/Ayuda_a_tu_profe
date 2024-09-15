@@ -6,3 +6,4 @@ langchain-openai
 python-dotenv
 fpdf
 PyPDF2
+markdown-pdf

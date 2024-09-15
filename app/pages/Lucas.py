@@ -5,6 +5,7 @@ from langchain_core.output_parsers import SimpleJsonOutputParser
 import dotenv
 import os
 import PyPDF2
+from markdown_pdf import MarkdownPdf, Section
 from io import BytesIO
 
 st.set_page_config(
@@ -89,12 +90,6 @@ Ejemplo:
 }
 """
 
-# Iniciar variables de estado
-if "questions_generated" not in st.session_state:
-    st.session_state.questions_generated = []
-if "questions_selected" not in st.session_state:
-    st.session_state.questions_selected = []
-
 
 # Función para leer archivos PDF
 def read_pdf(file):
@@ -103,6 +98,49 @@ def read_pdf(file):
     for page_num in range(len(pdf_reader.pages)):
         text += pdf_reader.pages[page_num].extract_text()
     return text
+
+
+def get_number_of_questions(json, type_question):
+    json_len = len(json)
+    if type_question == "Alternativas":
+        return json_len // 4
+    else:
+        return json_len // 3
+
+
+def parse_question_jsons(json, type_question):
+    num_questions = get_number_of_questions(json, type_question)
+    questions = []
+    for i in range(num_questions):
+        question = json[f"pregunta_{i + 1}"]
+        bibliography = json[f"bibliografia_{i + 1}"]
+        answer = json[f"respuesta_{i + 1}"]
+        if type_question == "Alternativas":
+            alternatives = json[f"alternativas_{i + 1}"]
+            questions.append(
+                {
+                    "pregunta": question,
+                    "bibliografia": bibliography,
+                    "respuesta": answer,
+                    "alternativas": alternatives,
+                }
+            )
+        else:
+            questions.append(
+                {
+                    "pregunta": question,
+                    "bibliografia": bibliography,
+                    "respuesta": answer,
+                }
+            )
+    return questions
+
+
+# Iniciar variables de estado
+if "questions_generated" not in st.session_state:
+    st.session_state.questions_generated = []
+if "questions_selected" not in st.session_state:
+    st.session_state.questions_selected = []
 
 
 # Interfaz de Streamlit
@@ -147,8 +185,6 @@ if (
     and uploaded_bibliography
     and uploaded_sample_questions
 ):
-    # Limpiar el estado
-    st.session_state.questions_generated = []
     # Seleccionar el template de output
     complete_user_template_message = ""
     if question_type == "Desarrollo":
@@ -163,7 +199,6 @@ if (
         complete_user_template_message = (
             user_template_message + output_verdadero_falso_template
         )
-    print("Template:", complete_user_template_message)
     # Crear el prompt para LLM
     prompt_template = ChatPromptTemplate.from_messages(
         messages=[
@@ -185,71 +220,120 @@ if (
 
     # Generar las preguntas
     questions_json = chain.invoke(prompt_input)
-    st.session_state.questions_generated = questions_json
+    questions = parse_question_jsons(questions_json, question_type)
 
-print("Preguntas generadas:", st.session_state.questions_generated)
-# Mostrar las preguntas generadas como "cards"
+    # Agregar las preguntas generadas al estado
+    st.session_state.questions_generated = questions
+
+
+def show_card_question(question):
+    with st.expander(f"**{question['pregunta']}**"):
+        st.write(f"Bibliografía: {question['bibliografia']}")
+        st.write(f"Respuesta: {question['respuesta']}")
+        if "alternativas" in question:
+            st.write(f"Alternativas: {', '.join(question['alternativas'])}")
+
+
+def select_question(question):
+    st.session_state.questions_selected.append(question)
+    st.session_state.questions_generated.remove(question)
+
+
+def delete_question(question):
+    st.session_state.questions_selected.remove(question)
+
+
+# Mostrar las preguntas generadas
 if st.session_state.questions_generated:
     st.markdown("### Preguntas generadas:")
-    # Mostrar cada pregunta con su respuesta y bibliografía
-    for question in st.session_state.questions_generated:
-        with st.expander(f"**{question['pregunta']}**"):
-            st.write(f"Bibliografía: {question['bibliografia']}")
-            st.write(f"Respuesta: {question['respuesta']}")
-            if "alternativas" in question:
-                st.write(f"Alternativas: {', '.join(question['alternativas'])}")
 
-    # Seleccionar preguntas generadas
-    selected_questions = st.multiselect(
-        "Selecciona las preguntas que deseas agregar al documento final",
-        options=[q["pregunta"] for q in st.session_state.questions_generated],
-    )
-
-
-# Función para generar el PDF
-def create_pdf(content):
-    pdf_writer = PyPDF2.PdfWriter()
-    packet = BytesIO()
-
-    # Crear un archivo PDF en memoria
-    pdf_writer.add_blank_page(width=210, height=297)  # A4 dimensions
-    packet.seek(0)
-
-    # Escribir el contenido en el archivo
-    for page_content in content:
-        page = pdf_writer.pages[0]
-        page.merge_text(page_content)
-
-    # Guardar el archivo en BytesIO
-    pdf_writer.write(packet)
-    packet.seek(0)
-    return packet
-
-
-# Botón para generar PDFs
-if st.button("Generar PDF") and selected_questions:
-    # Generar el contenido de las preguntas seleccionadas
-    preguntas_pdf_content = []
-    respuestas_pdf_content = []
-
-    for question in st.session_state.questions_generated:
-        if question["pregunta"] in selected_questions:
-            preguntas_pdf_content.append(f"Pregunta: {question['pregunta']}\n")
-            respuestas_pdf_content.append(
-                f"Pregunta: {question['pregunta']}\nRespuesta: {question['respuesta']}\n"
+    for idx, question in enumerate(st.session_state.questions_generated):
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            # Botón para seleccionar la pregunta
+            st.button(
+                "Agregar",
+                key=f"select_{idx}",
+                on_click=select_question,
+                args=(question,),
             )
+        with col2:
+            show_card_question(question)
 
-    # Crear PDFs para preguntas y respuestas
-    preguntas_pdf = create_pdf(preguntas_pdf_content)
-    respuestas_pdf = create_pdf(respuestas_pdf_content)
+# Mostrar las preguntas seleccionadas
+if st.session_state.questions_selected:
+    st.markdown("### Preguntas seleccionadas:")
 
-    # Botones para descargar los PDFs
+    for idx, question in enumerate(st.session_state.questions_selected):
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.button(
+                "Eliminar",
+                key=f"delete_{idx}",
+                on_click=delete_question,
+                args=(question,),
+            )
+        with col2:
+            show_card_question(question)
+
+
+def markdown_question_text(question):
+    question_title = f"### {question['pregunta']}"
+    question_bibliography = f"Bibliografía: {question['bibliografia']}"
+    question_answer = f"Respuesta: {question['respuesta']}"
+    if "alternativas" in question:
+        a_option = f"Opción A: {question['alternativas'][0]}"
+        b_option = f"Opción B: {question['alternativas'][1]}"
+        c_option = f"Opción C: {question['alternativas'][2]}"
+        d_option = f"Opción D: {question['alternativas'][3]}"
+        return "\n".join(
+            [
+                question_title,
+                question_bibliography,
+                question_answer,
+                a_option,
+                b_option,
+                c_option,
+                d_option,
+            ]
+        )
+    return "\n".join([question_title, question_bibliography, question_answer])
+
+
+def markdown_test_text(selected_questions, topic):
+    title = "# Prueba sobre " + topic
+    questions = []
+    for idx, question in enumerate(selected_questions):
+        question_title = f"### Pregunta {idx + 1}"
+        question_text = markdown_question_text(question)
+        questions.append(question_title)
+        questions.append(question_text)
+    return "\n".join([title] + questions)
+
+
+# Función para generar un PDF usando MarkdownPdf
+def markdown_test_to_pdf(selected_questions, topic):
+    markdown_content = markdown_test_text(selected_questions, topic)
+
+    pdf = MarkdownPdf()
+    section = Section(markdown_content, toc=False)
+    pdf.add_section(section)
+
+    # Guardar el PDF en un buffer en memoria
+    pdf_output = BytesIO()
+    pdf.save(pdf_output)
+    pdf_output.seek(0)  # Volver al inicio del archivo en memoria
+    return pdf_output
+
+
+# Botón para generar y descargar el PDF
+if st.button("Generar PDF"):
+    pdf_output = markdown_test_to_pdf(st.session_state.questions_selected, topic)
+
+    # Descargar el archivo PDF
     st.download_button(
-        "Descargar preguntas",
-        preguntas_pdf,
-        file_name="preguntas.pdf",
+        label="Descargar PDF",
+        data=pdf_output,
+        file_name="prueba.pdf",
         mime="application/pdf",
-    )
-    st.download_button(
-        "Descargar pauta", respuestas_pdf, file_name="pauta.pdf", mime="application/pdf"
     )
