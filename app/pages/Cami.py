@@ -1,50 +1,55 @@
 import streamlit as st
+from PyPDF2 import PdfReader # type: ignore
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import dotenv
 import os
 
-st.set_page_config(
-    page_title="Hello",
-    page_icon="👋",
-)
-
+# Cargar la clave API de OpenAI
 dotenv.load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-llm = ChatOpenAI(openai_api_key=api_key, model="gpt-3.5-turbo")
+# Función para extraer texto del PDF
+def extraer_texto_pdf(pdf_file):
+    reader = PdfReader(pdf_file)
+    texto = ""
+    for page in reader.pages:
+        texto += page.extract_text()
+    return texto
 
-system_template_message = """
-You are a geography teacher.
-"""
+# Función para planificar contenido
+def planificar_contenidos(programa, bibliografia):
+    prompt = f"""Ayuda a planificar el contenido de un curso basado en este programa: {programa}.
+                 También incorpora o ajusta las siguientes referencias bibliográficas: {bibliografia}.
+                 Sugiéreme cómo cambiar la orientación del curso o diseñar nuevas clases en base a este contenido."""
+    
+    # Inicializar el modelo de ChatGPT
+    llm = ChatOpenAI(api_key=OPENAI_API_KEY, temperature=0.7)
+    response = llm(prompt)
+    
+    # Devolver el contenido generado
+    return response.content
 
-user_template_message = """
-What is the capital of {country}?
-"""
+# Interfaz en Streamlit
+st.title("Planificador de Contenidos para Profesores")
 
-prompt_template = ChatPromptTemplate.from_messages(
-    messages=[
-        ("system", system_template_message),
-        ("user", user_template_message),
-    ]
-)
+# Cargar programa en PDF
+programa_pdf = st.file_uploader("Sube el programa del curso en formato PDF", type="pdf")
+bibliografia_input = st.text_area("Ingresa la nueva bibliografía o deja en blanco si no la deseas modificar:")
 
-# El StrOutputParser se puede cambiar según el tipo de output que se espere
-chain = prompt_template | llm | StrOutputParser()
+programa_texto = ""
+if programa_pdf:
+    programa_texto = extraer_texto_pdf(programa_pdf)
+    st.write("Texto extraído del programa:")
+    st.write(programa_texto)
 
-
-st.markdown("# Crea tu evaluación")
-
-country_selected = st.multiselect(
-    "Selecciona los países de los cuales quieres preguntar",
-    ["México", "Estados Unidos", "Canadá", "Brasil", "Argentina", "Chile"],
-)
-
-template_prompt_input = {
-    "country": country_selected,
-}
-
-if st.button("Generar pregunta"):
-    respuesta_generada = chain.invoke(template_prompt_input)
-    st.write("Respuesta generada:", respuesta_generada)
+if st.button("Planificar Nuevas Clases"):
+    if programa_texto:
+        # Planificar contenido basado en el programa extraído y la bibliografía proporcionada
+        planificacion = planificar_contenidos(programa_texto, bibliografia_input)
+        
+        st.write("### Planificación sugerida:")
+        st.write(planificacion)
+    else:
+        st.write("Por favor, sube un PDF con el programa del curso.")
