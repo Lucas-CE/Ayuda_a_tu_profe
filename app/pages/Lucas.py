@@ -72,7 +72,7 @@ El output debe ser un objeto JSON con las llaves
 - alternativas_i: las alternativas de respuesta
 
 Ejemplo:
-{
+{{
     "pregunta_1": "¿Cuál es la capital de Francia?",
     "bibliografia_1": "la capital de Francia es París",
     "respuesta_1": "París",
@@ -81,7 +81,7 @@ Ejemplo:
     "bibliografia_2": "la capital de España es Madrid",
     "respuesta_2": "Madrid",
     "alternativas_2": ["París", "Madrid", "Londres", "Berlín"],
-}
+}}
 """
 
 output_verdadero_falso_template = """
@@ -91,14 +91,14 @@ El output debe ser un objeto JSON con las llaves
 - respuesta_i: la respuesta basada en la bibliografía
 
 Ejemplo:
-{
+{{
     "pregunta_1": "¿La capital de Francia es París?",
     "bibliografia_1": "la capital de Francia es París",
     "respuesta_1": "Verdadero",
     "pregunta_2": "¿La capital de España es Madrid?",
     "bibliografia_2": "la capital de España es Madrid",
     "respuesta_2": "Verdadero",
-}
+}}
 """
 
 
