@@ -36,7 +36,7 @@ Eres un profesor experto en crear evaluaciones de la materia {topic}.
 """
 
 user_template_message = """
-Basado en la siguiente bibliografía:
+Basado en tu conocimiento y en la siguiente bibliografía:
 {bibliography}
 
 en las siguientes preguntas realizadas anteriormente:
