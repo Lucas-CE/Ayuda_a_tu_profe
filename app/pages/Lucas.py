@@ -301,7 +301,7 @@ if st.session_state.questions_generated:
     st.markdown("### Preguntas generadas:")
 
     for idx, question in enumerate(st.session_state.questions_generated):
-        col1, col2 = st.columns([0.4, 4])
+        col1, col2 = st.columns([0.5, 4])
         with col1:
             # Botón para seleccionar la pregunta
             st.button(
@@ -318,7 +318,7 @@ if st.session_state.questions_selected:
     st.markdown("### Preguntas seleccionadas:")
 
     for idx, question in enumerate(st.session_state.questions_selected):
-        col1, col2 = st.columns([1, 4])
+        col1, col2 = st.columns([0.5, 4])
         with col1:
             st.button(
                 "Eliminar",
