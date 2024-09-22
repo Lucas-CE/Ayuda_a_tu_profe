@@ -8,6 +8,12 @@ import PyPDF2
 from markdown_pdf import MarkdownPdf, Section
 from io import BytesIO
 
+# COSAS A MEJORAR
+# - Agregar métodos de feedback para preguntas generadas
+# - Desarrollo: existen preguntas de desarrollo y otras aplicadas como calculos
+# - Agregar parámetro de cuánto tiempo se tiene para responder cada pregunta
+# - Agregar espacio para agregar comentarios a la generación de preguntas
+
 # Configuración de la página
 st.set_page_config(
     page_title="Generador de Evaluaciones", page_icon="📝", layout="wide"
