@@ -220,7 +220,7 @@ st.title("Generador de Evaluaciones 📝")
 topic = st.text_input("Ingresa el tema de la evaluación")
 
 num_questions = st.number_input(
-    "Número de preguntas", min_value=1, max_value=20, step=1
+    "Número de preguntas", min_value=1, max_value=10, step=1
 )
 question_type = st.selectbox(
     "Tipo de preguntas", ["Alternativas", "Desarrollo", "Verdadero y Falso"]
@@ -254,6 +254,10 @@ if (
     st.button("Generar preguntas")
     and uploaded_bibliography
     and uploaded_sample_questions
+    and topic
+    and num_questions
+    and question_type
+    and directness
 ):
     # Seleccionar el template de output
     complete_user_template_message = ""
@@ -289,8 +293,13 @@ if (
     }
 
     # Generar las preguntas
-    questions_json = chain.invoke(prompt_input)
-    questions = parse_question_jsons(questions_json, question_type)
+    try:
+        questions_json = chain.invoke(prompt_input)
+        questions = parse_question_jsons(questions_json, question_type)
+    except Exception as e:
+        st.error(f"Error al generar las preguntas: {e}")
+        st.text("Intentalo de nuevo.")
+        questions = []
 
     # Agregar las preguntas generadas al estado
     st.session_state.questions_generated = questions
