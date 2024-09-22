@@ -329,15 +329,11 @@ if st.session_state.questions_selected:
         with col2:
             show_card_question(question)
 
-
-# Botón para generar y descargar el PDF
-if st.button("Generar PDF"):
-    pdf_output = markdown_test_to_pdf(st.session_state.questions_selected, topic)
-
-    # Descargar el archivo PDF
+# Un solo botón para generar y descargar el PDF
+if st.session_state.questions_selected:
     st.download_button(
         label="Descargar PDF",
-        data=pdf_output,
-        file_name="prueba.pdf",
+        data=markdown_test_to_pdf(st.session_state.questions_selected, topic),
+        file_name=f"Prueba de {topic}.pdf",
         mime="application/pdf",
     )
