@@ -15,7 +15,7 @@ def buscar_bibliografia(tema):
     prompt = f"Recomienda bibliografía académica sobre el tema '{tema}'."
     
     # Inicializar el modelo de ChatGPT
-    llm = ChatOpenAI(api_key=OPENAI_API_KEY, temperature=0.7)
+    llm = ChatOpenAI(api_key=OPENAI_API_KEY, temperature=0.7, model="gpt-4o-mini")
 
     # Procesar el prompt
     response = llm(prompt)

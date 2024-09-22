@@ -17,7 +17,7 @@ st.set_page_config(
 dotenv.load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-llm = ChatOpenAI(openai_api_key=api_key, model="gpt-3.5-turbo")
+llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model="gpt-4o-mini")
 
 # Plantilla para el sistema
 system_template_message = """
