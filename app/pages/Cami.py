@@ -15,7 +15,7 @@ st.set_page_config(
 
 # Cargar variables de entorno
 dotenv.load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 llm = ChatOpenAI(openai_api_key=api_key, model="gpt-4")
 

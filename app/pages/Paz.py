@@ -33,10 +33,10 @@ if st.button("Buscar"):
 
         st.write("### Bibliografía recomendada:")
         
-        # Dividir la bibliografía en líneas y enumerarlas manualmente con st.markdown
+        # Mostrar la bibliografía directamente sin numerar
         libros = bibliografia.split("\n")
-        for i, libro in enumerate(libros, start=1):
+        for libro in libros:
             if libro.strip():  # Evitar mostrar líneas vacías
-                st.markdown(f"{i}. {libro.strip()}")
+                st.markdown(f"{libro.strip()}")  # Mostrar sin numerar
     else:
         st.write("Por favor, ingresa un tema.")
