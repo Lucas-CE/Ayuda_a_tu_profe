@@ -273,27 +273,28 @@ if (
         complete_user_template_message = (
             user_template_message + output_verdadero_falso_template
         )
-    # Crear el prompt para LLM
-    prompt_template = ChatPromptTemplate.from_messages(
-        messages=[
-            ("system", system_template_message),
-            ("user", complete_user_template_message),
-        ]
-    )
-    chain = prompt_template | llm | SimpleJsonOutputParser()
-
-    # Crear el input para el modelo
-    prompt_input = {
-        "bibliography": bibliography_text,
-        "sample_questions": sample_questions_text,
-        "question_quantity": num_questions,
-        "question_type": question_type,
-        "directness": directness,
-        "topic": topic,
-    }
-
+        
     # Generar las preguntas
     try:
+        # Crear el prompt para LLM
+        prompt_template = ChatPromptTemplate.from_messages(
+            messages=[
+                ("system", system_template_message),
+                ("user", complete_user_template_message),
+            ]
+        )
+        chain = prompt_template | llm | SimpleJsonOutputParser()
+
+        # Crear el input para el modelo
+        prompt_input = {
+            "bibliography": bibliography_text,
+            "sample_questions": sample_questions_text,
+            "question_quantity": num_questions,
+            "question_type": question_type,
+            "directness": directness,
+            "topic": topic,
+        }
+
         questions_json = chain.invoke(prompt_input)
         questions = parse_question_jsons(questions_json, question_type)
     except Exception as e:
