@@ -42,7 +42,7 @@ El output debe ser un objeto JSON con las siguientes llaves:
 - Indicador de logro: lo que se espera que el estudiante logre
 - Estrategias de evaluación: propuestas de evaluación que miden los logros
 - Resultados de aprendizaje: objetivos que los estudiantes deben alcanzar
-- Bibliografía del tema: Una lista de referencias relevantes para el tema en formato APA
+- Bibliografía: Una lista de referencias relevantes para el tema en formato APA
 
 Ejemplo:
 {{
