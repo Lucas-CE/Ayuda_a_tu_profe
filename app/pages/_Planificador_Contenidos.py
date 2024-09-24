@@ -42,23 +42,23 @@ El output debe ser un objeto JSON con las siguientes llaves:
 - Indicador de logro: lo que se espera que el estudiante logre
 - Estrategias de evaluación: propuestas de evaluación que miden los logros
 - Resultados de aprendizaje: objetivos que los estudiantes deben alcanzar
-- Bibliografía del tema: en formato APA
+- Bibliografía del tema: Una lista de referencias relevantes para el tema en formato APA
 
 Ejemplo:
 {{
     "Tema": "Ética y responsabilidad en el uso de IA",
     "Contenidos": [
-        "4.1. Sesgos y discriminación en la IA",
-        "4.2. Privacidad y seguridad de los datos",
-        "4.3. Responsabilidad social y legal en la IA"
+        "1. Sesgos y discriminación en la IA",
+        "2. Privacidad y seguridad de los datos",
+        "3. Responsabilidad social y legal en la IA"
     ],
-    "Indicador de logro": [
-        "El estudiante comprende dimensiones éticas del uso de IA",
-        "El estudiante reconoce riesgos de sesgo en IA"
+    "Indicadores de logro": [
+        "1. El estudiante comprende dimensiones éticas del uso de IA",
+        "2. El estudiante reconoce riesgos de sesgo en IA"
     ],
     "Estrategias de evaluación": [
-        "Participación en discusiones",
-        "Estudio de casos sobre sesgo en IA"
+        "1. Participación en discusiones",
+        "2. Estudio de casos sobre sesgo en IA"
     ],
     "Resultados de aprendizaje": [
         "Comprende los riesgos de sesgo en la IA",
@@ -142,23 +142,57 @@ if st.button("Generar Planificación"):
         plan_json = chain.invoke(prompt_input)
         
         # Mostrar el resultado generado
+        # Mostrar el resultado generado
+    # Mostrar el resultado generado
         st.markdown("### Planificación sugerida:")
+
         if isinstance(plan_json, list):
             for i, tema in enumerate(plan_json):
-                st.write(f"**Tema {i+1}:** {tema.get('Tema')}")
-                st.write(f"**Contenidos:** {tema.get('Contenidos')}")
-                st.write(f"**Indicador de logro:** {tema.get('Indicador de logro')}")
-                st.write(f"**Estrategias de evaluación:** {tema.get('Estrategias de evaluación')}")
-                st.write(f"**Resultados de aprendizaje:** {tema.get('Resultados de aprendizaje')}")
-                st.write(f"**Bibliografía:** {tema.get('Bibliografía')}")
+                st.markdown(f"**Tema {i+1}:** {tema.get('Tema')}")
+                
+                st.markdown("**Contenidos:**")
+                for contenido in tema.get('Contenidos', []):
+                    st.write(f"- {contenido}")
+                
+                st.markdown("**Indicador de logro:**")
+                for indicador in tema.get('Indicadores de logro', []):
+                    st.write(f"- {indicador}")
+                
+                st.markdown("**Estrategias de evaluación:**")
+                for estrategia in tema.get('Estrategias de evaluación', []):
+                    st.write(f"- {estrategia}")
+                
+                st.markdown("**Resultados de aprendizaje:**")
+                for resultado in tema.get('Resultados de aprendizaje', []):
+                    st.write(f"- {resultado}")
+                
+                st.markdown("**Bibliografía:**")
+                for referencia in tema.get('Bibliografía', []):
+                    st.write(f"- {referencia}")
+
         elif isinstance(plan_json, dict):
             for i in range(len(plan_json) // 3):
-                st.write(f"**Tema {i+1}:** {plan_json.get(f'tema_{i+1}')}")
-                st.write(f"**Contenidos:** {plan_json.get(f'contenidos_{i+1}')}")
-                st.write(f"**Indicador de logro:** {plan_json.get(f'indicador_logro_{i+1}')}")
-                st.write(f"**Estrategias de evaluación:** {plan_json.get(f'estrategias_evaluacion_{i+1}')}")
-                st.write(f"**Resultados de aprendizaje:** {plan_json.get(f'resultados_aprendizaje_{i+1}')}")
-                st.write(f"**Bibliografía:** {plan_json.get(f'bibliografia_{i+1}')}")
+                st.markdown(f"**Tema {i+1}:** {plan_json.get(f'tema_{i+1}')}")
+                
+                st.markdown("**Contenidos:**")
+                for contenido in plan_json.get(f'contenidos_{i+1}', []):
+                    st.write(f"- {contenido}")
+                
+                st.markdown("**Indicador de logro:**")
+                for indicador in plan_json.get(f'indicador_logro_{i+1}', []):
+                    st.write(f"- {indicador}")
+                
+                st.markdown("**Estrategias de evaluación:**")
+                for estrategia in plan_json.get(f'estrategias_evaluacion_{i+1}', []):
+                    st.write(f"- {estrategia}")
+                
+                st.markdown("**Resultados de aprendizaje:**")
+                for resultado in plan_json.get(f'resultados_aprendizaje_{i+1}', []):
+                    st.write(f"- {resultado}")
+                
+                st.markdown("**Bibliografía:**")
+                for referencia in plan_json.get(f'bibliografia_{i+1}', []):
+                    st.write(f"- {referencia}")
 
         # Generar críticas y recomendaciones
         #critiques = analyze_and_critique_program(
