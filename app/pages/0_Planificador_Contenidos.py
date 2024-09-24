@@ -42,7 +42,11 @@ El output debe ser un objeto JSON con las siguientes llaves:
 - Indicador de logro: lo que se espera que el estudiante logre
 - Estrategias de evaluación: propuestas de evaluación que miden los logros
 - Resultados de aprendizaje: objetivos que los estudiantes deben alcanzar
+<<<<<<< HEAD:app/pages/0_Planificador_Contenidos.py
 - Bibliografía del tema: en formato APA
+=======
+- Bibliografía: Una lista de referencias relevantes para el tema en formato APA
+>>>>>>> 6d7403b1397233389acda1c5ccc008b71112dd32:app/pages/_Planificador_Contenidos.py
 
 Ejemplo:
 {{
