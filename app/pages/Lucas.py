@@ -36,7 +36,7 @@ Eres un profesor experto en crear evaluaciones de la materia {topic}.
 """
 
 user_template_message = """
-Basado en la siguiente bibliografía:
+Basado en tu conocimiento y en la siguiente bibliografía:
 {bibliography}
 
 en las siguientes preguntas realizadas anteriormente:
@@ -220,7 +220,7 @@ st.title("Generador de Evaluaciones 📝")
 topic = st.text_input("Ingresa el tema de la evaluación")
 
 num_questions = st.number_input(
-    "Número de preguntas", min_value=1, max_value=20, step=1
+    "Número de preguntas", min_value=1, max_value=10, step=1
 )
 question_type = st.selectbox(
     "Tipo de preguntas", ["Alternativas", "Desarrollo", "Verdadero y Falso"]
@@ -254,6 +254,10 @@ if (
     st.button("Generar preguntas")
     and uploaded_bibliography
     and uploaded_sample_questions
+    and topic
+    and num_questions
+    and question_type
+    and directness
 ):
     # Seleccionar el template de output
     complete_user_template_message = ""
@@ -289,8 +293,13 @@ if (
     }
 
     # Generar las preguntas
-    questions_json = chain.invoke(prompt_input)
-    questions = parse_question_jsons(questions_json, question_type)
+    try:
+        questions_json = chain.invoke(prompt_input)
+        questions = parse_question_jsons(questions_json, question_type)
+    except Exception as e:
+        st.error(f"Error al generar las preguntas: {e}")
+        st.text("Intentalo de nuevo.")
+        questions = []
 
     # Agregar las preguntas generadas al estado
     st.session_state.questions_generated = questions
@@ -301,7 +310,7 @@ if st.session_state.questions_generated:
     st.markdown("### Preguntas generadas:")
 
     for idx, question in enumerate(st.session_state.questions_generated):
-        col1, col2 = st.columns([0.4, 4])
+        col1, col2 = st.columns([0.5, 4])
         with col1:
             # Botón para seleccionar la pregunta
             st.button(
@@ -318,7 +327,7 @@ if st.session_state.questions_selected:
     st.markdown("### Preguntas seleccionadas:")
 
     for idx, question in enumerate(st.session_state.questions_selected):
-        col1, col2 = st.columns([1, 4])
+        col1, col2 = st.columns([0.5, 4])
         with col1:
             st.button(
                 "Eliminar",
@@ -329,15 +338,11 @@ if st.session_state.questions_selected:
         with col2:
             show_card_question(question)
 
-
-# Botón para generar y descargar el PDF
-if st.button("Generar PDF"):
-    pdf_output = markdown_test_to_pdf(st.session_state.questions_selected, topic)
-
-    # Descargar el archivo PDF
+# Un solo botón para generar y descargar el PDF
+if st.session_state.questions_selected:
     st.download_button(
         label="Descargar PDF",
-        data=pdf_output,
-        file_name="prueba.pdf",
+        data=markdown_test_to_pdf(st.session_state.questions_selected, topic),
+        file_name=f"Prueba de {topic}.pdf",
         mime="application/pdf",
     )
