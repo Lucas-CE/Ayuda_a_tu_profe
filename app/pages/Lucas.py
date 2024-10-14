@@ -257,7 +257,7 @@ st.title("Generador de Evaluaciones 📝")
 topic = st.text_input("Ingresa el tema de la evaluación")
 
 num_questions = st.number_input(
-    "Número de preguntas", min_value=1, max_value=10, step=1
+    "Número de preguntas", min_value=1, max_value=20, step=1
 )
 question_type = st.selectbox(
     "Tipo de preguntas", ["Alternativas", "Desarrollo", "Verdadero y Falso"]
@@ -299,8 +299,6 @@ if (
     # Seleccionar el template de output
     complete_user_template_message = user_template_message
     feedback_questions_text = ""
-    print("Questions liked: ", st.session_state.questions_liked)
-    print("Questions disliked: ", st.session_state.questions_disliked)
     if st.session_state.questions_liked or st.session_state.questions_disliked:
         feedback_questions_text = start_feedback_questions_template
     if st.session_state.questions_liked:
@@ -328,7 +326,6 @@ if (
             ("user", complete_user_template_message),
         ]
     )
-    print("Complete user template message: ", complete_user_template_message)
     chain = prompt_template | llm | SimpleJsonOutputParser()
 
     # Crear el input para el modelo
