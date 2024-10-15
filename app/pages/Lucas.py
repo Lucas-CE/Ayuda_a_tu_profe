@@ -43,7 +43,7 @@ en las siguientes preguntas realizadas anteriormente:
 {sample_questions}
 
 Crea {question_quantity} preguntas de tipo {question_type}
-sobre el tema {topic}, y que las respuestas sean {directness}
+sobre el tema {topic}, y que las preguntas tengan dificultad {difficulty}
 a partir de la bibliografía.
 """
 
@@ -114,6 +114,11 @@ liked_template_question = """
 disliked_template_question = """
 - No me gustan las siguientes preguntas:
 {questions_disliked}
+"""
+
+comentarios_adicionales = """
+Considera estos comentarios adicionales al crear las preguntas:
+{comments}
 """
 
 
@@ -257,7 +262,7 @@ st.title("Generador de Evaluaciones 📝")
 topic = st.text_input("Ingresa el tema de la evaluación")
 
 num_questions = st.number_input(
-    "Número de preguntas", min_value=1, max_value=20, step=1
+    "Número de preguntas", min_value=1, max_value=10, step=1
 )
 question_type = st.selectbox(
     "Tipo de preguntas", ["Alternativas", "Desarrollo", "Verdadero y Falso"]
@@ -268,10 +273,12 @@ uploaded_sample_questions = st.file_uploader(
     "Sube preguntas anteriores (PDF)", type=["pdf"]
 )
 
-directness = st.selectbox(
-    "¿Qué tan directas deben ser las respuestas a partir de la bibliografía?",
-    ["Muy directas", "Semi directas", "No directas"],
+difficulty = st.selectbox(
+    "¿Qué tan difícil quieres que sean las preguntas?",
+    ["Fácil", "Intermedio", "Difícil"],
 )
+
+extra_comments = st.text_area("Comentarios adicionales")
 
 # Leer la bibliografía y preguntas tipo subidas
 bibliography_text = ""
@@ -294,7 +301,7 @@ if (
     and topic
     and num_questions
     and question_type
-    and directness
+    and difficulty
 ):
     # Seleccionar el template de output
     complete_user_template_message = user_template_message
@@ -319,6 +326,12 @@ if (
     elif question_type == "Verdadero y Falso":
         complete_user_template_message = "\n" + output_verdadero_falso_template
 
+    # Agragar comentarios adicionales
+    if extra_comments:
+        complete_user_template_message += "\n" + comentarios_adicionales.format(
+            comments=extra_comments
+        )
+
     # Crear el prompt para LLM
     prompt_template = ChatPromptTemplate.from_messages(
         messages=[
@@ -334,7 +347,7 @@ if (
         "sample_questions": sample_questions_text,
         "question_quantity": num_questions,
         "question_type": question_type,
-        "directness": directness,
+        "difficulty": difficulty,
         "topic": topic,
     }
 
