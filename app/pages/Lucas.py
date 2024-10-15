@@ -116,6 +116,11 @@ disliked_template_question = """
 {questions_disliked}
 """
 
+comentarios_adicionales = """
+Considera estos comentarios adicionales al crear las preguntas:
+{comments}
+"""
+
 
 # Función para leer archivos PDF
 @st.cache_data
@@ -273,6 +278,8 @@ difficulty = st.selectbox(
     ["Fácil", "Intermedio", "Difícil"],
 )
 
+extra_comments = st.text_area("Comentarios adicionales")
+
 # Leer la bibliografía y preguntas tipo subidas
 bibliography_text = ""
 sample_questions_text = ""
@@ -318,6 +325,12 @@ if (
         complete_user_template_message += "\n" + output_alternativas_template
     elif question_type == "Verdadero y Falso":
         complete_user_template_message = "\n" + output_verdadero_falso_template
+
+    # Agragar comentarios adicionales
+    if extra_comments:
+        complete_user_template_message += "\n" + comentarios_adicionales.format(
+            comments=extra_comments
+        )
 
     # Crear el prompt para LLM
     prompt_template = ChatPromptTemplate.from_messages(
