@@ -28,7 +28,7 @@ pip install -r requirements.txt
 ```
 2. Inicia la aplicación con:
 ```bash
-streamlit run app/Ayuda_a_tu_profe.py
+streamlit run app\Ayuda_a_tu_profe!.py
 ```
 
 
