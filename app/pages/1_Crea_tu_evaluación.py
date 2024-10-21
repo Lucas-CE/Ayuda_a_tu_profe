@@ -43,7 +43,7 @@ en las siguientes preguntas realizadas anteriormente:
 {sample_questions}
 
 Crea {question_quantity} preguntas de tipo {question_type}
-sobre el tema {topic}, y que las respuestas sean {directness}
+sobre el tema {topic}, y que las preguntas tengan dificultad {difficulty}
 a partir de la bibliografía.
 """
 
@@ -99,6 +99,26 @@ Ejemplo:
     "bibliografia_2": "la capital de España es Madrid",
     "respuesta_2": "Verdadero",
 }}
+"""
+
+
+start_feedback_questions_template = """
+Para crear las preguntas, considera que:
+"""
+
+liked_template_question = """
+- Me gustan las siguientes preguntas:
+{questions_liked}
+"""
+
+disliked_template_question = """
+- No me gustan las siguientes preguntas:
+{questions_disliked}
+"""
+
+comentarios_adicionales = """
+Considera estos comentarios adicionales al crear las preguntas:
+{comments}
 """
 
 
@@ -206,11 +226,33 @@ def markdown_test_to_pdf(selected_questions, topic):
     return pdf_output
 
 
+def handle_like_dislike(question, action):
+    # Si la card no está en el diccionario de estado, inicializamos
+    if action == "like":
+        if question in st.session_state.questions_disliked:
+            st.session_state.questions_disliked.remove(question)
+        if question in st.session_state.questions_liked:
+            st.session_state.questions_liked.remove(question)
+        else:
+            st.session_state.questions_liked.append(question)
+    elif action == "dislike":
+        if question in st.session_state.questions_liked:
+            st.session_state.questions_liked.remove(question)
+        if question in st.session_state.questions_disliked:
+            st.session_state.questions_disliked.remove(question)
+        else:
+            st.session_state.questions_disliked.append(question)
+
+
 # Iniciar variables de estado
 if "questions_generated" not in st.session_state:
     st.session_state.questions_generated = []
 if "questions_selected" not in st.session_state:
     st.session_state.questions_selected = []
+if "questions_liked" not in st.session_state:
+    st.session_state.questions_liked = []
+if "questions_disliked" not in st.session_state:
+    st.session_state.questions_disliked = []
 
 
 # Interfaz de usuario
@@ -231,10 +273,12 @@ uploaded_sample_questions = st.file_uploader(
     "Sube preguntas anteriores (PDF)", type=["pdf"]
 )
 
-directness = st.selectbox(
-    "¿Qué tan directas deben ser las respuestas a partir de la bibliografía?",
-    ["Muy directas", "Semi directas", "No directas"],
+difficulty = st.selectbox(
+    "¿Qué tan difícil quieres que sean las preguntas?",
+    ["Fácil", "Intermedio", "Difícil"],
 )
+
+extra_comments = st.text_area("Comentarios adicionales")
 
 # Leer la bibliografía y preguntas tipo subidas
 bibliography_text = ""
@@ -257,44 +301,58 @@ if (
     and topic
     and num_questions
     and question_type
-    and directness
+    and difficulty
 ):
     # Seleccionar el template de output
-    complete_user_template_message = ""
+    complete_user_template_message = user_template_message
+    feedback_questions_text = ""
+    if st.session_state.questions_liked or st.session_state.questions_disliked:
+        feedback_questions_text = start_feedback_questions_template
+    if st.session_state.questions_liked:
+        feedback_questions_text += liked_template_question.format(
+            questions_liked="\n".join(st.session_state.questions_liked)
+        )
+    if st.session_state.questions_disliked:
+        feedback_questions_text += disliked_template_question.format(
+            questions_disliked="\n".join(st.session_state.questions_disliked)
+        )
+
+    complete_user_template_message += feedback_questions_text
+
     if question_type == "Desarrollo":
-        complete_user_template_message = (
-            user_template_message + output_desarrollo_template
-        )
+        complete_user_template_message += "\n" + output_desarrollo_template
     elif question_type == "Alternativas":
-        complete_user_template_message = (
-            user_template_message + output_alternativas_template
-        )
+        complete_user_template_message += "\n" + output_alternativas_template
     elif question_type == "Verdadero y Falso":
-        complete_user_template_message = (
-            user_template_message + output_verdadero_falso_template
+        complete_user_template_message = "\n" + output_verdadero_falso_template
+
+    # Agragar comentarios adicionales
+    if extra_comments:
+        complete_user_template_message += "\n" + comentarios_adicionales.format(
+            comments=extra_comments
         )
-        
+
+    # Crear el prompt para LLM
+    prompt_template = ChatPromptTemplate.from_messages(
+        messages=[
+            ("system", system_template_message),
+            ("user", complete_user_template_message),
+        ]
+    )
+    chain = prompt_template | llm | SimpleJsonOutputParser()
+
+    # Crear el input para el modelo
+    prompt_input = {
+        "bibliography": bibliography_text,
+        "sample_questions": sample_questions_text,
+        "question_quantity": num_questions,
+        "question_type": question_type,
+        "difficulty": difficulty,
+        "topic": topic,
+    }
+
     # Generar las preguntas
     try:
-        # Crear el prompt para LLM
-        prompt_template = ChatPromptTemplate.from_messages(
-            messages=[
-                ("system", system_template_message),
-                ("user", complete_user_template_message),
-            ]
-        )
-        chain = prompt_template | llm | SimpleJsonOutputParser()
-
-        # Crear el input para el modelo
-        prompt_input = {
-            "bibliography": bibliography_text,
-            "sample_questions": sample_questions_text,
-            "question_quantity": num_questions,
-            "question_type": question_type,
-            "directness": directness,
-            "topic": topic,
-        }
-
         questions_json = chain.invoke(prompt_input)
         questions = parse_question_jsons(questions_json, question_type)
     except Exception as e:
@@ -311,7 +369,7 @@ if st.session_state.questions_generated:
     st.markdown("### Preguntas generadas:")
 
     for idx, question in enumerate(st.session_state.questions_generated):
-        col1, col2 = st.columns([0.5, 4])
+        col1, col2, col_like, col_dislike = st.columns([0.5, 4, 0.6, 0.7])
         with col1:
             # Botón para seleccionar la pregunta
             st.button(
@@ -322,6 +380,25 @@ if st.session_state.questions_generated:
             )
         with col2:
             show_card_question(question)
+        # Column to give feedback about the question: like dislike
+        with col_like:
+            question_liked = question['pregunta'] in st.session_state.questions_liked
+            text_like_btn = "👍**Liked**" if question_liked else "👍Like"
+            like_btn = st.button(
+                text_like_btn,
+                key=f"like_{idx}",
+                on_click=handle_like_dislike,
+                args=(question['pregunta'], "like"),
+            )
+        with col_dislike:
+            question_disliked = question['pregunta'] in st.session_state.questions_disliked
+            text_dislike_btn = "👎**Disliked**" if question_disliked else "👎Dislike"
+            dislike_btn = st.button(
+                text_dislike_btn,
+                key=f"dislike_{idx}",
+                on_click=handle_like_dislike,
+                args=(question['pregunta'], "dislike"),
+            )
 
 # Mostrar las preguntas seleccionadas
 if st.session_state.questions_selected:
