@@ -17,7 +17,7 @@ dotenv.load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 
 # Configuración del modelo LLM con OpenAI
-llm = ChatOpenAI(openai_api_key=api_key, model="gpt-3.5-turbo")
+llm = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
 
 # Función para extraer texto del archivo PDF
 def extract_pdf_text(file):
