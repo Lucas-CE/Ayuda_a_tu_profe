@@ -1,7 +1,6 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import SimpleJsonOutputParser
 import dotenv
 import os
 import PyPDF2
@@ -17,7 +16,7 @@ class QuestionAnswer(BaseModel):
 
 
 class QuestionAnswerList(BaseModel):
-    question_answers: List[QuestionAnswer]
+    questions_answers: List[QuestionAnswer]
 
 
 # Configuración de la página
@@ -31,7 +30,9 @@ st.set_page_config(
 def load_model():
     dotenv.load_dotenv()
     api_key = os.getenv("OPENAI_API_KEY")
-    return ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
+    model = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
+    structured_llm = model.with_structured_output(QuestionAnswerList)
+    return structured_llm
 
 
 llm = load_model()
@@ -39,34 +40,41 @@ llm = load_model()
 # Plantilla para el sistema
 system_template_message = """
 Eres un profesor experto en crear evaluaciones de la materia {topic}.
-"""
 
-user_template_message = """
-Basado en tu conocimiento y en la siguiente bibliografía:
+Basado en tu conocimiento y en la bibliografía:
 {bibliography}
 
 en las siguientes preguntas realizadas anteriormente:
 {sample_questions}
 
+tienes que crear una evaluación según las especificaciones dadas
+por el profesor.
+
+"""
+
+comentarios_adicionales = """
+Considera estos comentarios adicionales al crear las preguntas:
+{comments}
+"""
+
+user_template_message = """
 Crea {question_quantity} preguntas de tipo {question_type}
-sobre el tema {topic}, y que las preguntas tengan dificultad {difficulty}
-a partir de la bibliografía.
+sobre el tema {topic} basandote en la bibliografía.
+Las preguntas deben tener dificultad {difficulty}.
 """
 
 output_desarrollo_template = """
-El output debe ser un objeto JSON con las llaves
-- pregunta_i: la pregunta generada
-- bibliografia_i: la sección relevante de la bibliografía
-- respuesta_i: la respuesta basada en la bibliografía
+El output debe ser un objeto JSON con la llave question_answers,
+que tiene como valor una lista de objetos JSON con las llaves
+- pregunta: la pregunta generada
+- respuesta: la respuesta basada en la bibliografía
 
 Ejemplo:
 {{
-    "pregunta_1": "¿Cuál es la capital de Francia?",
-    "bibliografia_1": "la capital de Francia es París",
-    "respuesta_1": "París",
-    "pregunta_2": "¿Cuál es la capital de España?",
-    "bibliografia_2": "la capital de España es Madrid",
-    "respuesta_2": "Madrid",
+    "question_answers": [
+        {{"pregunta": "¿Cuál es la capital de Francia?", "respuesta": "París"}},
+        {{"pregunta": "¿Cuál es la capital de España?", "respuesta": "Madrid"}},
+    ]
 }}
 """
 
@@ -107,11 +115,6 @@ Ejemplo:
 }}
 """
 
-comentarios_adicionales = """
-Considera estos comentarios adicionales al crear las preguntas:
-{comments}
-"""
-
 
 # Función para leer archivos PDF
 @st.cache_data
@@ -123,19 +126,11 @@ def read_pdf(file):
     return text
 
 
-# Función para analizar las preguntas JSON
-def parse_question_jsons(json, type_question):
-    num_questions = len(json) // (4 if type_question == "Alternativas" else 3)
+# Función extraer preguntas y respuestas
+def parse_question_jsons(questions_answers_list: List[QuestionAnswer]):
     questions = []
-    for i in range(num_questions):
-        question = {
-            "pregunta": json[f"pregunta_{i + 1}"],
-            "bibliografia": json[f"bibliografia_{i + 1}"],
-            "respuesta": json[f"respuesta_{i + 1}"],
-        }
-        if type_question == "Alternativas":
-            question["alternativas"] = json[f"alternativas_{i + 1}"]
-        questions.append(question)
+    for question_answer in questions_answers_list:
+        questions.append(question_answer.model_dump())
     return questions
 
 
@@ -150,20 +145,19 @@ def generate_questions(prompt_input, question_type):
 
     prompt_template = ChatPromptTemplate.from_messages(
         [
-            ("system", system_template_message),
-            ("user", user_template_message + output_template),
+            ("system", system_template_message + output_template),
+            ("user", user_template_message),
         ]
     )
-    chain = prompt_template | llm | SimpleJsonOutputParser()
+    chain = prompt_template | llm
 
     questions_json = chain.invoke(prompt_input)
     return parse_question_jsons(questions_json, question_type)
 
 
 def show_card_question(question):
-    with st.expander(f"**{question['pregunta']}**"):
-        st.write(f"Bibliografía: {question['bibliografia']}")
-        st.write(f"Respuesta: {question['respuesta']}")
+    with st.expander(f"**{question['pregunta']}**", expanded=True):
+        st.write(f"**Respuesta**: {question['respuesta']}")
         if "alternativas" in question:
             st.write(f"Alternativas: {', '.join(question['alternativas'])}")
 
@@ -183,7 +177,6 @@ def delete_question(question):
 # Funciones para generar el texto Markdown y PDF
 def markdown_question_text(question):
     question_title = f"### {question['pregunta']}"
-    question_bibliography = f"Bibliografía: {question['bibliografia']}"
     question_answer = f"Respuesta: {question['respuesta']}"
     if "alternativas" in question:
         alternatives = [
@@ -191,9 +184,9 @@ def markdown_question_text(question):
             for i, alt in enumerate(question["alternativas"])
         ]
         return "\n".join(
-            [question_title, question_bibliography, question_answer] + alternatives
+            [question_title, question_answer] + alternatives
         )
-    return "\n\n".join([question_title, question_bibliography, question_answer])
+    return "\n\n".join([question_title, question_answer])
 
 
 def markdown_test_text(selected_questions, topic):
@@ -215,7 +208,6 @@ def markdown_test_to_pdf(selected_questions, topic):
     pdf.save(pdf_output)
     pdf_output.seek(0)
     return pdf_output
-
 
 
 # Iniciar variables de estado
@@ -274,29 +266,28 @@ if (
     and difficulty
 ):
     # Seleccionar el template de output
-    complete_user_template_message = user_template_message
+    complete_system_template_message = system_template_message
 
-    if question_type == "Desarrollo":
-        complete_user_template_message += "\n" + output_desarrollo_template
-    elif question_type == "Alternativas":
-        complete_user_template_message += "\n" + output_alternativas_template
-    elif question_type == "Verdadero y Falso":
-        complete_user_template_message = "\n" + output_verdadero_falso_template
-
-    # Agragar comentarios adicionales
     if extra_comments:
-        complete_user_template_message += "\n" + comentarios_adicionales.format(
+        complete_system_template_message += "\n" + comentarios_adicionales.format(
             comments=extra_comments
         )
+
+    if question_type == "Desarrollo":
+        complete_system_template_message += "\n" + output_desarrollo_template
+    elif question_type == "Alternativas":
+        complete_system_template_message += "\n" + output_alternativas_template
+    elif question_type == "Verdadero y Falso":
+        complete_system_template_message = "\n" + output_verdadero_falso_template
 
     # Crear el prompt para LLM
     prompt_template = ChatPromptTemplate.from_messages(
         messages=[
-            ("system", system_template_message),
-            ("user", complete_user_template_message),
+            ("system", complete_system_template_message),
+            ("user", user_template_message),
         ]
     )
-    chain = prompt_template | llm | SimpleJsonOutputParser()
+    chain = prompt_template | llm
 
     # Crear el input para el modelo
     prompt_input = {
@@ -311,7 +302,8 @@ if (
     # Generar las preguntas
     try:
         questions_json = chain.invoke(prompt_input)
-        questions = parse_question_jsons(questions_json, question_type)
+        questions = parse_question_jsons(questions_json.questions_answers)
+        print(questions)
     except Exception as e:
         st.error(f"Error al generar las preguntas: {e}")
         st.text("Intentalo de nuevo.")
