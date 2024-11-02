@@ -24,6 +24,16 @@ st.set_page_config(
     page_title="Generador de Evaluaciones", page_icon="📝", layout="wide"
 )
 
+# Inicializar estados para edición
+if "editing_question" not in st.session_state:
+    st.session_state.editing_question = None
+if "editing_answer" not in st.session_state:
+    st.session_state.editing_answer = None
+if "editing_alternatives" not in st.session_state:
+    st.session_state.editing_alternatives = None
+if "editing_section" not in st.session_state:
+    st.session_state.editing_section = None
+
 
 # Cargar variables de entorno y configurar el modelo
 @st.cache_resource
@@ -155,11 +165,114 @@ def generate_questions(prompt_input, question_type):
     return parse_question_jsons(questions_json, question_type)
 
 
-def show_card_question(question):
-    with st.expander(f"**{question['pregunta']}**", expanded=True):
-        st.write(f"**Respuesta**: {question['respuesta']}")
+def toggle_edit_mode(question_idx, section):
+    collection = (
+        st.session_state.questions_selected
+        if section == "selected"
+        else st.session_state.questions_generated
+    )
+    question = collection[question_idx]
+
+    if (
+        st.session_state.editing_question == question_idx
+        and st.session_state.editing_section == section
+    ):
+        st.session_state.editing_question = None
+        st.session_state.editing_answer = None
+        st.session_state.editing_alternatives = None
+        st.session_state.editing_section = None
+    else:
+        st.session_state.editing_question = question_idx
+        st.session_state.editing_answer = question["respuesta"]
+        st.session_state.editing_section = section
         if "alternativas" in question:
-            st.write(f"Alternativas: {', '.join(question['alternativas'])}")
+            st.session_state.editing_alternatives = ", ".join(question["alternativas"])
+
+
+def save_edits(question_idx, section):
+    collection = (
+        st.session_state.questions_selected
+        if section == "selected"
+        else st.session_state.questions_generated
+    )
+    question = collection[question_idx]
+
+    # Usar keys específicas para cada sección
+    question["pregunta"] = st.session_state.get(
+        f"edit_question_{section}_{question_idx}", question["pregunta"]
+    )
+    question["respuesta"] = st.session_state.get(
+        f"edit_answer_{section}_{question_idx}", question["respuesta"]
+    )
+
+    if "alternativas" in question:
+        alternatives_text = st.session_state.get(
+            f"edit_alternatives_{section}_{question_idx}", ""
+        )
+        question["alternativas"] = [alt.strip() for alt in alternatives_text.split(",")]
+
+    st.session_state.editing_question = None
+    st.session_state.editing_answer = None
+    st.session_state.editing_alternatives = None
+    st.session_state.editing_section = None
+
+
+def show_card_question(question, idx, section):
+    is_editing = (
+        st.session_state.editing_question == idx
+        and st.session_state.editing_section == section
+    )
+
+    # Crear un contenedor con borde y padding
+    with st.container():
+        # Primera fila: Pregunta y botones
+        col1, col2, col3 = st.columns([3.4, 0.22, 0.22])
+
+        with col1:
+            if is_editing:
+                st.text_input(
+                    "Pregunta",
+                    value=question["pregunta"],
+                    key=f"edit_question_{section}_{idx}",
+                )
+            else:
+                st.markdown(f"**Pregunta:** {question['pregunta']}")
+
+        with col2:
+            st.button(
+                "✏️",
+                key=f"edit_{section}_{idx}",
+                on_click=toggle_edit_mode,
+                args=(idx, section),
+            )
+
+        with col3:
+            if is_editing:
+                st.button(
+                    "💾",
+                    key=f"save_{section}_{idx}",
+                    on_click=save_edits,
+                    args=(idx, section),
+                )
+
+        # Segunda fila: Respuesta y alternativas
+        if is_editing:
+            st.text_area(
+                "Respuesta",
+                value=question["respuesta"],
+                key=f"edit_answer_{section}_{idx}",
+            )
+
+            if "alternativas" in question:
+                st.text_input(
+                    "Alternativas (separadas por comas)",
+                    value=", ".join(question["alternativas"]),
+                    key=f"edit_alternatives_{section}_{idx}",
+                )
+        else:
+            st.markdown(f"**Respuesta:** {question['respuesta']}")
+            if "alternativas" in question:
+                st.markdown(f"**Alternativas:** {', '.join(question['alternativas'])}")
 
 
 # Funciones para seleccionar y eliminar preguntas
@@ -183,9 +296,7 @@ def markdown_question_text(question):
             f"Opción {chr(65+i)}: {alt}"
             for i, alt in enumerate(question["alternativas"])
         ]
-        return "\n".join(
-            [question_title, question_answer] + alternatives
-        )
+        return "\n".join([question_title, question_answer] + alternatives)
     return "\n\n".join([question_title, question_answer])
 
 
@@ -303,7 +414,6 @@ if (
     try:
         questions_json = chain.invoke(prompt_input)
         questions = parse_question_jsons(questions_json.questions_answers)
-        print(questions)
     except Exception as e:
         st.error(f"Error al generar las preguntas: {e}")
         st.text("Intentalo de nuevo.")
@@ -315,12 +425,12 @@ if (
 
 # Mostrar las preguntas generadas
 if st.session_state.questions_generated:
-    st.markdown("### Preguntas generadas:")
+    st.markdown("## Preguntas generadas:")
+    st.markdown(" ")
 
     for idx, question in enumerate(st.session_state.questions_generated):
         col1, col2 = st.columns([0.5, 4])
         with col1:
-            # Botón para seleccionar la pregunta
             st.button(
                 "Agregar",
                 key=f"select_{idx}",
@@ -328,12 +438,13 @@ if st.session_state.questions_generated:
                 args=(question,),
             )
         with col2:
-            show_card_question(question)
-
+            show_card_question(question, idx, "generated")
+        st.markdown("---")  # Línea divisoria sutil
 
 # Mostrar las preguntas seleccionadas
 if st.session_state.questions_selected:
-    st.markdown("### Preguntas seleccionadas:")
+    st.markdown("## Preguntas seleccionadas:")
+    st.markdown(" ")
 
     for idx, question in enumerate(st.session_state.questions_selected):
         col1, col2 = st.columns([0.5, 4])
@@ -345,12 +456,13 @@ if st.session_state.questions_selected:
                 args=(question,),
             )
         with col2:
-            show_card_question(question)
+            show_card_question(question, idx, "selected")
+        st.markdown("---")  # Línea divisoria sutil
 
 # Un solo botón para generar y descargar el PDF
 if st.session_state.questions_selected:
     st.download_button(
-        label="Descargar PDF",
+        label="Descargar Pauta",
         data=markdown_test_to_pdf(st.session_state.questions_selected, topic),
         file_name=f"Prueba de {topic}.pdf",
         mime="application/pdf",
