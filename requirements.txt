@@ -7,4 +7,5 @@ python-dotenv
 fpdf
 PyPDF2
 markdown-pdf
-pydantic==2.5.0
+pydantic
+ydata-profiling
