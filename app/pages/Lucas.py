@@ -7,12 +7,18 @@ import os
 import PyPDF2
 from markdown_pdf import MarkdownPdf, Section
 from io import BytesIO
+from pydantic import BaseModel
+from typing import List
 
-# COSAS A MEJORAR
-# - Agregar métodos de feedback para preguntas generadas
-# - Desarrollo: existen preguntas de desarrollo y otras aplicadas como calculos
-# - Agregar parámetro de cuánto tiempo se tiene para responder cada pregunta
-# - Agregar espacio para agregar comentarios a la generación de preguntas
+
+class QuestionAnswer(BaseModel):
+    pregunta: str
+    respuesta: str
+
+
+class QuestionAnswerList(BaseModel):
+    question_answers: List[QuestionAnswer]
+
 
 # Configuración de la página
 st.set_page_config(
