@@ -7,4 +7,4 @@ python-dotenv
 fpdf
 PyPDF2
 markdown-pdf
-pydantic==2.8.2
+pydantic==1.*
