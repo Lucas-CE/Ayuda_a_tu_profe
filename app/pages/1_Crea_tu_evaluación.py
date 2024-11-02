@@ -2,8 +2,6 @@ import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import SimpleJsonOutputParser
-import dotenv
-import os
 import PyPDF2
 from markdown_pdf import MarkdownPdf, Section
 from io import BytesIO
@@ -23,8 +21,7 @@ st.set_page_config(
 # Cargar variables de entorno y configurar el modelo
 @st.cache_resource
 def load_model():
-    dotenv.load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = st.secrets["OPENAI_API_KEY"]
     return ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
 
 

@@ -3,11 +3,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-# Configurar OpenAI
-import dotenv
-import os
-dotenv.load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+
 
 # Crear función para generar bibliografía
 def buscar_bibliografia(tema):

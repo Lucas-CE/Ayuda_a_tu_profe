@@ -12,9 +12,7 @@ st.set_page_config(
     page_icon="📅",
 )
 
-# Cargar las variables de entorno
-dotenv.load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = st.secrets["OPENAI_API_KEY"]
 
 # Configuración del modelo LLM con OpenAI
 llm = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")

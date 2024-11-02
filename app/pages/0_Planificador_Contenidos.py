@@ -2,8 +2,6 @@ import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import SimpleJsonOutputParser
-import dotenv
-import os
 import PyPDF2
 from fpdf import FPDF
 
@@ -13,9 +11,7 @@ st.set_page_config(
     page_icon="📚",
 )
 
-# Cargar variables de entorno
-dotenv.load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 # Inicializar LLM
 llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model="gpt-4o-mini", temperature=
