@@ -14,7 +14,7 @@ st.set_page_config(
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 # Inicializar LLM
-llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model="gpt-4o-mini", temperature=
+llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model="gpt-4o-mini", temperature=0.7)
 
 # Función para leer archivos PDF
 def read_pdf(file):
