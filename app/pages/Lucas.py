@@ -83,7 +83,8 @@ Ejemplo:
 {{
     "question_answers": [
         {{"pregunta": "¿Cuál es la capital de Francia?", "respuesta": "París"}},
-        {{"pregunta": "¿Cuál es la capital de España?", "respuesta": "Madrid"}},
+        {{"pregunta": "Compara la ventaja competitiva de Zara con la de otra empresa de retail de tu elección. ¿Qué diferencias o similitudes ves en sus enfoques estratégicos?", "respuesta": "Zara se distingue por su enfoque en la integración vertical y el control total sobre su cadena de suministro, lo que le permite minimizar los tiempos de producción y responder rápidamente a las tendencias del mercado. En contraste, H&M tiende a externalizar gran parte de su producción, lo que le permite mayor flexibilidad en la elección de proveedores, pero pierde control sobre los tiempos de entrega y la capacidad de respuesta rápida. Mientras Zara se centra en la eficiencia y la velocidad, H&M opta por reducir costos mediante la subcontratación."}}
+        {{"pregunta": "En el contexto de búsqueda de textos expresados en espacios vectoriales, ¿por qué es útil la función de similitud coseno?", "respuesta": "La función de similitud coseno es útil en la búsqueda de textos expresados en espacios vectoriales porque mide la similitud entre dos vectores basándose en el ángulo entre ellos, en lugar de en su magnitud. Esto permite comparar textos de diferentes longitudes y normaliza la influencia de la magnitud de los vectores en la medida de similitud, lo que resulta en una comparación más precisa de la similitud semántica entre los textos."}}
     ]
 }}
 """
