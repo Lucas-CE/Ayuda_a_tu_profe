@@ -31,10 +31,10 @@ def extract_pdf_text(file):
 system_template_message = """
 Eres un experto en educación. Tu tarea es reorganizar un cronograma de curso dado, considerando:
 1. Las unidades faltantes y el tiempo restante disponible.
-2. Si la opción de combinar ramos está activada:
+2. Si la opción de combinar unidades está activada:
     - Elimina los contenidos menos importantes.
     - Combina en una misma semana los contenidos de distintas unidades que tengan sinergia entre sí.
-3. Si la opción de combinar ramos está desactivada:
+3. Si la opción de combinar unidades está desactivada:
     - Elimina únicamente los contenidos menos importantes.
     - No se deben mezclar contenidos de distintas unidades en una misma semana.
 4. Toda la materia faltante debe ajustarse al tiempo restante disponible, distribuyéndola de manera equitativa semana por semana.
@@ -81,8 +81,8 @@ semanas_disponibles = st.number_input(
     "¿Cuántas semanas tienes disponibles?", min_value=1, max_value=16, step=1, value=3
 )
 
-# Checkbox para combinar ramos
-combinar_ramos = st.checkbox("¿Permitir combinar ramos relacionados?", value=True)
+# Checkbox para combinar unidades
+combinar_unidades = st.checkbox("¿Permitir combinar unidades relacionadas?", value=True)
 
 # Generar cronograma si se ha cargado un archivo PDF
 if archivo_pdf and st.button("Generar Cronograma Ajustado"):
@@ -91,9 +91,9 @@ if archivo_pdf and st.button("Generar Cronograma Ajustado"):
 
         # Definir el texto adicional según la opción de combinación
         combinacion_texto = (
-            "La opción de combinar ramos está activada. Elimina los contenidos menos importantes y combina temas con sinergia en una misma semana."
-            if combinar_ramos else
-            "La opción de combinar ramos está desactivada. Solo se eliminarán los contenidos menos importantes, sin mezclar unidades en una misma semana."
+            "La opción de combinar unidades está activada. Elimina los contenidos menos importantes y combina temas con sinergia en una misma semana."
+            if combinar_unidades else
+            "La opción de combinar unidades está desactivada. Solo se eliminarán los contenidos menos importantes, sin mezclar unidades en una misma semana."
         )
 
         # Preparar el input para el template del prompt
