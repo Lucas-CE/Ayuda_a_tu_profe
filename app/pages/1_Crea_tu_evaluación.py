@@ -1,8 +1,6 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-import dotenv
-import os
 import PyPDF2
 from markdown_pdf import MarkdownPdf, Section
 from io import BytesIO
@@ -38,8 +36,7 @@ if "editing_section" not in st.session_state:
 # Cargar variables de entorno y configurar el modelo
 @st.cache_resource
 def load_model():
-    dotenv.load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = st.secrets["OPENAI_API_KEY"]
     model = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
     structured_llm = model.with_structured_output(QuestionAnswerList)
     return structured_llm
