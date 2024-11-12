@@ -1,3 +1,5 @@
+from pydantic import BaseModel, Field
+from typing import List
 import streamlit as st
 from langchain_openai import ChatOpenAI
 import dotenv
@@ -7,48 +9,63 @@ import os
 dotenv.load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Crear función para generar bibliografía sin links
-def buscar_bibliografia_sin_links(tema):
-    # Prompt para generar la bibliografía sin enlaces
-    prompt = f"Recomienda bibliografía académica sobre el tema '{tema}', sin incluir enlaces o links a sitios web."
 
-    # Inicializar el modelo de ChatGPT
+class ReferenciaBibliografica(BaseModel):
+    titulo: str = Field(description="Título exacto del libro o publicación")
+    autores: str = Field(description="Nombre(s) del autor o autores")
+    anio: str = Field(description="Año de publicación")
+    editorial: str = Field(default="", description="Editorial que publicó el trabajo")
+
+
+class ListaReferencias(BaseModel):
+    referencias: List[ReferenciaBibliografica] = Field(
+        description="Lista de referencias bibliográficas académicas"
+    )
+
+
+def buscar_bibliografia_sin_links(tema: str) -> List[ReferenciaBibliografica]:
     llm = ChatOpenAI(api_key=OPENAI_API_KEY, temperature=0.7, model="gpt-4o-mini")
+    structured_llm = llm.with_structured_output(ListaReferencias)
 
-    # Procesar el prompt
-    response = llm(prompt)
-    
-    # Devolver solo el contenido del mensaje
-    return response.content
+    prompt = f"""Genera 5 referencias bibliográficas académicas sobre '{tema}'.
+    Cada referencia debe incluir título, autores, año de publicación y editorial si está disponible."""
+
+    try:
+        resultado = structured_llm.invoke(prompt)
+        return resultado.referencias
+    except Exception as e:
+        st.error(f"Error al procesar las referencias: {str(e)}")
+        return []
+
 
 # Interfaz en Streamlit
 st.title("Buscador de Bibliografía Académica")
-tema = st.text_input("Ingresa el tema que deseas estudiar (ej: probabilidades avanzadas):")
+tema = st.text_input(
+    "Ingresa el tema que deseas estudiar (ej: probabilidades avanzadas):"
+)
 
 if st.button("Buscar"):
     if tema:
-        bibliografia = buscar_bibliografia_sin_links(tema)
+        referencias = buscar_bibliografia_sin_links(tema)
         st.write("### Bibliografía recomendada:")
-        
-        # Mostrar la bibliografía con el título en negritas y botón para buscar en Google
-        libros = bibliografia.split("\n")
-        for libro in libros:
-            if libro.strip():  # Evitar mostrar líneas vacías
-                # Extraer el título del texto entre comillas
-                inicio = libro.find('"')
-                fin = libro.find('"', inicio + 1)
-                if inicio != -1 and fin != -1:
-                    titulo = libro[inicio+1:fin]
-                    autores_y_detalles = libro[:inicio].strip() + libro[fin+1:].strip()
-                    
-                    # Mostrar el título en negrita y el botón "Buscar en Google"
-                    st.markdown(f"**{titulo}** - {autores_y_detalles}")
-                    st.markdown(
-                        f"[Buscar en Google](https://www.google.com/search?q={titulo.replace(' ', '+')})",
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(f"- {libro.strip()}")
+
+        for ref in referencias:
+            # Mostrar cada referencia en formato continuo
+            referencia_texto = f"""**Título:** {ref.titulo}
+            **Autores:** {ref.autores}
+            **Año:** {ref.anio}"""
+
+            if ref.editorial:
+                referencia_texto += f"""
+                **Editorial:** {ref.editorial}"""
+
+            st.markdown(referencia_texto)
+
+            # Botón de búsqueda en Google
+            st.markdown(
+                f"[Buscar en Google](https://www.google.com/search?q={ref.titulo.replace(' ', '+')})",
+                unsafe_allow_html=True,
+            )
+            st.markdown("---")
     else:
         st.write("Por favor, ingresa un tema.")
-
