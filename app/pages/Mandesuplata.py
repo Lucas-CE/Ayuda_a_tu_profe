@@ -4,7 +4,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import dotenv
 import os
-import PyPDF2
+from utils.pdf_utils import extract_text_from_pdf
 
 # Configuración de la página de Streamlit
 st.set_page_config(
@@ -19,13 +19,6 @@ api_key = os.getenv("OPENAI_API_KEY")
 # Configuración del modelo LLM con OpenAI
 llm = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
 
-# Función para extraer texto del archivo PDF
-def extract_pdf_text(file):
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page_num in range(len(pdf_reader.pages)):
-        text += pdf_reader.pages[page_num].extract_text()
-    return text
 
 # Templates para el prompt del modelo
 system_template_message = """
@@ -87,7 +80,7 @@ combinar_unidades = st.checkbox("¿Permitir combinar unidades relacionadas?", va
 # Generar cronograma si se ha cargado un archivo PDF
 if archivo_pdf and st.button("Generar Cronograma Ajustado"):
     with st.spinner("Generando cronograma..."):
-        programa_texto = extract_pdf_text(archivo_pdf)
+        programa_texto = extract_text_from_pdf(archivo_pdf)
 
         # Definir el texto adicional según la opción de combinación
         combinacion_texto = (
