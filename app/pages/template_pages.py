@@ -13,7 +13,7 @@ st.set_page_config(
 dotenv.load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 
-llm = ChatOpenAI(openai_api_key=api_key, model="gpt-3.5-turbo")
+llm = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
 
 system_template_message = """
 You are a geography teacher.

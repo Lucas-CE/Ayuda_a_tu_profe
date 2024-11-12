@@ -1,31 +1,33 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import SimpleJsonOutputParser
-import dotenv
-import os
-import PyPDF2
-from markdown_pdf import MarkdownPdf, Section
-from io import BytesIO
-
-# COSAS A MEJORAR
-# - Agregar métodos de feedback para preguntas generadas
-# - Desarrollo: existen preguntas de desarrollo y otras aplicadas como calculos
-# - Agregar parámetro de cuánto tiempo se tiene para responder cada pregunta
-# - Agregar espacio para agregar comentarios a la generación de preguntas
+from utils.pdf_utils import extract_text_from_pdf, convert_test_to_pdf
+from typing import List
+from models.question import QuestionAnswer, QuestionAnswerList
 
 # Configuración de la página
 st.set_page_config(
     page_title="Generador de Evaluaciones", page_icon="📝", layout="wide"
 )
 
+# Inicializar estados para edición
+if "editing_question" not in st.session_state:
+    st.session_state.editing_question = None
+if "editing_answer" not in st.session_state:
+    st.session_state.editing_answer = None
+if "editing_alternatives" not in st.session_state:
+    st.session_state.editing_alternatives = None
+if "editing_section" not in st.session_state:
+    st.session_state.editing_section = None
+
 
 # Cargar variables de entorno y configurar el modelo
 @st.cache_resource
 def load_model():
-    dotenv.load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY")
-    return ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
+    api_key = st.secrets["OPENAI_API_KEY"]
+    model = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
+    structured_llm = model.with_structured_output(QuestionAnswerList)
+    return structured_llm
 
 
 llm = load_model()
@@ -33,34 +35,42 @@ llm = load_model()
 # Plantilla para el sistema
 system_template_message = """
 Eres un profesor experto en crear evaluaciones de la materia {topic}.
-"""
 
-user_template_message = """
-Basado en tu conocimiento y en la siguiente bibliografía:
+Basado en tu conocimiento y en la bibliografía:
 {bibliography}
 
 en las siguientes preguntas realizadas anteriormente:
 {sample_questions}
 
+tienes que crear una evaluación según las especificaciones dadas
+por el profesor.
+
+"""
+
+comentarios_adicionales = """
+Considera estos comentarios adicionales al crear las preguntas:
+{comments}
+"""
+
+user_template_message = """
 Crea {question_quantity} preguntas de tipo {question_type}
-sobre el tema {topic}, y que las respuestas sean {directness}
-a partir de la bibliografía.
+sobre el tema {topic} basandote en la bibliografía.
+Las preguntas deben tener dificultad {difficulty}.
 """
 
 output_desarrollo_template = """
-El output debe ser un objeto JSON con las llaves
-- pregunta_i: la pregunta generada
-- bibliografia_i: la sección relevante de la bibliografía
-- respuesta_i: la respuesta basada en la bibliografía
+El output debe ser un objeto JSON con la llave question_answers,
+que tiene como valor una lista de objetos JSON con las llaves
+- pregunta: la pregunta generada
+- respuesta: la respuesta basada en la bibliografía
 
 Ejemplo:
 {{
-    "pregunta_1": "¿Cuál es la capital de Francia?",
-    "bibliografia_1": "la capital de Francia es París",
-    "respuesta_1": "París",
-    "pregunta_2": "¿Cuál es la capital de España?",
-    "bibliografia_2": "la capital de España es Madrid",
-    "respuesta_2": "Madrid",
+    "question_answers": [
+        {{"pregunta": "¿Cuál es la capital de Francia?", "respuesta": "París"}},
+        {{"pregunta": "Compara la ventaja competitiva de Zara con la de otra empresa de retail de tu elección. ¿Qué diferencias o similitudes ves en sus enfoques estratégicos?", "respuesta": "Zara se distingue por su enfoque en la integración vertical y el control total sobre su cadena de suministro, lo que le permite minimizar los tiempos de producción y responder rápidamente a las tendencias del mercado. En contraste, H&M tiende a externalizar gran parte de su producción, lo que le permite mayor flexibilidad en la elección de proveedores, pero pierde control sobre los tiempos de entrega y la capacidad de respuesta rápida. Mientras Zara se centra en la eficiencia y la velocidad, H&M opta por reducir costos mediante la subcontratación."}}
+        {{"pregunta": "En el contexto de búsqueda de textos expresados en espacios vectoriales, ¿por qué es útil la función de similitud coseno?", "respuesta": "La función de similitud coseno es útil en la búsqueda de textos expresados en espacios vectoriales porque mide la similitud entre dos vectores basándose en el ángulo entre ellos, en lugar de en su magnitud. Esto permite comparar textos de diferentes longitudes y normaliza la influencia de la magnitud de los vectores en la medida de similitud, lo que resulta en una comparación más precisa de la similitud semántica entre los textos."}}
+    ]
 }}
 """
 
@@ -102,29 +112,11 @@ Ejemplo:
 """
 
 
-# Función para leer archivos PDF
-@st.cache_data
-def read_pdf(file):
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text()
-    return text
-
-
-# Función para analizar las preguntas JSON
-def parse_question_jsons(json, type_question):
-    num_questions = len(json) // (4 if type_question == "Alternativas" else 3)
+# Función extraer preguntas y respuestas
+def parse_question_jsons(questions_answers_list: List[QuestionAnswer]):
     questions = []
-    for i in range(num_questions):
-        question = {
-            "pregunta": json[f"pregunta_{i + 1}"],
-            "bibliografia": json[f"bibliografia_{i + 1}"],
-            "respuesta": json[f"respuesta_{i + 1}"],
-        }
-        if type_question == "Alternativas":
-            question["alternativas"] = json[f"alternativas_{i + 1}"]
-        questions.append(question)
+    for question_answer in questions_answers_list:
+        questions.append(question_answer.model_dump())
     return questions
 
 
@@ -139,22 +131,124 @@ def generate_questions(prompt_input, question_type):
 
     prompt_template = ChatPromptTemplate.from_messages(
         [
-            ("system", system_template_message),
-            ("user", user_template_message + output_template),
+            ("system", system_template_message + output_template),
+            ("user", user_template_message),
         ]
     )
-    chain = prompt_template | llm | SimpleJsonOutputParser()
+    chain = prompt_template | llm
 
     questions_json = chain.invoke(prompt_input)
     return parse_question_jsons(questions_json, question_type)
 
 
-def show_card_question(question):
-    with st.expander(f"**{question['pregunta']}**"):
-        st.write(f"Bibliografía: {question['bibliografia']}")
-        st.write(f"Respuesta: {question['respuesta']}")
+def toggle_edit_mode(question_idx, section):
+    collection = (
+        st.session_state.questions_selected
+        if section == "selected"
+        else st.session_state.questions_generated
+    )
+    question = collection[question_idx]
+
+    if (
+        st.session_state.editing_question == question_idx
+        and st.session_state.editing_section == section
+    ):
+        st.session_state.editing_question = None
+        st.session_state.editing_answer = None
+        st.session_state.editing_alternatives = None
+        st.session_state.editing_section = None
+    else:
+        st.session_state.editing_question = question_idx
+        st.session_state.editing_answer = question["respuesta"]
+        st.session_state.editing_section = section
         if "alternativas" in question:
-            st.write(f"Alternativas: {', '.join(question['alternativas'])}")
+            st.session_state.editing_alternatives = ", ".join(question["alternativas"])
+
+
+def save_edits(question_idx, section):
+    collection = (
+        st.session_state.questions_selected
+        if section == "selected"
+        else st.session_state.questions_generated
+    )
+    question = collection[question_idx]
+
+    # Usar keys específicas para cada sección
+    question["pregunta"] = st.session_state.get(
+        f"edit_question_{section}_{question_idx}", question["pregunta"]
+    )
+    question["respuesta"] = st.session_state.get(
+        f"edit_answer_{section}_{question_idx}", question["respuesta"]
+    )
+
+    if "alternativas" in question:
+        alternatives_text = st.session_state.get(
+            f"edit_alternatives_{section}_{question_idx}", ""
+        )
+        question["alternativas"] = [alt.strip() for alt in alternatives_text.split(",")]
+
+    st.session_state.editing_question = None
+    st.session_state.editing_answer = None
+    st.session_state.editing_alternatives = None
+    st.session_state.editing_section = None
+
+
+def show_card_question(question, idx, section):
+    is_editing = (
+        st.session_state.editing_question == idx
+        and st.session_state.editing_section == section
+    )
+
+    # Crear un contenedor con borde y padding
+    with st.container():
+        # Primera fila: Pregunta y botones
+        col1, col2, col3 = st.columns([3.4, 0.22, 0.22])
+
+        with col1:
+            if is_editing:
+                st.text_input(
+                    "Pregunta",
+                    value=question["pregunta"],
+                    key=f"edit_question_{section}_{idx}",
+                )
+            else:
+                st.markdown(f"**Pregunta:** {question['pregunta']}")
+
+        with col2:
+            st.button(
+                "✏️",
+                key=f"edit_{section}_{idx}",
+                on_click=toggle_edit_mode,
+                args=(idx, section),
+            )
+
+        with col3:
+            if is_editing:
+                st.button(
+                    "💾",
+                    key=f"save_{section}_{idx}",
+                    on_click=save_edits,
+                    args=(idx, section),
+                )
+
+        # Segunda fila: Respuesta y alternativas
+        if is_editing:
+            st.text_area(
+                "Respuesta",
+                value=question["respuesta"],
+                key=f"edit_answer_{section}_{idx}",
+            )
+
+            if "alternativas" in question:
+                st.text_input(
+                    "Alternativas (separadas por comas)",
+                    value=", ".join(question["alternativas"]),
+                    key=f"edit_alternatives_{section}_{idx}",
+                )
+        else:
+            st.markdown(f"**Respuesta:** {question['respuesta']}")
+            if "alternativas" in question:
+                st.markdown(f"**Alternativas:** {', '.join(question['alternativas'])}")
 
 
 # Funciones para seleccionar y eliminar preguntas
@@ -167,43 +261,6 @@ def select_question(question):
 
 def delete_question(question):
     st.session_state.questions_selected.remove(question)
-
-
-# Funciones para generar el texto Markdown y PDF
-def markdown_question_text(question):
-    question_title = f"### {question['pregunta']}"
-    question_bibliography = f"Bibliografía: {question['bibliografia']}"
-    question_answer = f"Respuesta: {question['respuesta']}"
-    if "alternativas" in question:
-        alternatives = [
-            f"Opción {chr(65+i)}: {alt}"
-            for i, alt in enumerate(question["alternativas"])
-        ]
-        return "\n".join(
-            [question_title, question_bibliography, question_answer] + alternatives
-        )
-    return "\n\n".join([question_title, question_bibliography, question_answer])
-
-
-def markdown_test_text(selected_questions, topic):
-    title = f"# Prueba sobre {topic}"
-    questions = []
-    for idx, question in enumerate(selected_questions):
-        question_title = f"### Pregunta {idx + 1}"
-        question_text = markdown_question_text(question)
-        questions.extend([question_title, question_text])
-    return "\n".join([title] + questions)
-
-
-def markdown_test_to_pdf(selected_questions, topic):
-    markdown_content = markdown_test_text(selected_questions, topic)
-    pdf = MarkdownPdf()
-    section = Section(markdown_content, toc=False)
-    pdf.add_section(section)
-    pdf_output = BytesIO()
-    pdf.save(pdf_output)
-    pdf_output.seek(0)
-    return pdf_output
 
 
 # Iniciar variables de estado
@@ -231,20 +288,22 @@ uploaded_sample_questions = st.file_uploader(
     "Sube preguntas anteriores (PDF)", type=["pdf"]
 )
 
-directness = st.selectbox(
-    "¿Qué tan directas deben ser las respuestas a partir de la bibliografía?",
-    ["Muy directas", "Semi directas", "No directas"],
+difficulty = st.selectbox(
+    "¿Qué tan difícil quieres que sean las preguntas?",
+    ["Fácil", "Intermedio", "Difícil"],
 )
+
+extra_comments = st.text_area("Comentarios adicionales")
 
 # Leer la bibliografía y preguntas tipo subidas
 bibliography_text = ""
 sample_questions_text = ""
 
 if uploaded_bibliography:
-    bibliography_text = read_pdf(uploaded_bibliography)
+    bibliography_text = extract_text_from_pdf(uploaded_bibliography)
 
 if uploaded_sample_questions:
-    sample_questions_text = read_pdf(uploaded_sample_questions)
+    sample_questions_text = extract_text_from_pdf(uploaded_sample_questions)
 
 if uploaded_bibliography and uploaded_sample_questions:
     st.success("Archivos cargados correctamente.")
@@ -257,46 +316,46 @@ if (
     and topic
     and num_questions
     and question_type
-    and directness
+    and difficulty
 ):
     # Seleccionar el template de output
-    complete_user_template_message = ""
+    complete_system_template_message = system_template_message
+
+    if extra_comments:
+        complete_system_template_message += "\n" + comentarios_adicionales.format(
+            comments=extra_comments
+        )
+
     if question_type == "Desarrollo":
-        complete_user_template_message = (
-            user_template_message + output_desarrollo_template
-        )
+        complete_system_template_message += "\n" + output_desarrollo_template
     elif question_type == "Alternativas":
-        complete_user_template_message = (
-            user_template_message + output_alternativas_template
-        )
+        complete_system_template_message += "\n" + output_alternativas_template
     elif question_type == "Verdadero y Falso":
-        complete_user_template_message = (
-            user_template_message + output_verdadero_falso_template
-        )
-        
+        complete_system_template_message = "\n" + output_verdadero_falso_template
+
+    # Crear el prompt para LLM
+    prompt_template = ChatPromptTemplate.from_messages(
+        messages=[
+            ("system", complete_system_template_message),
+            ("user", user_template_message),
+        ]
+    )
+    chain = prompt_template | llm
+
+    # Crear el input para el modelo
+    prompt_input = {
+        "bibliography": bibliography_text,
+        "sample_questions": sample_questions_text,
+        "question_quantity": num_questions,
+        "question_type": question_type,
+        "difficulty": difficulty,
+        "topic": topic,
+    }
+
     # Generar las preguntas
     try:
-        # Crear el prompt para LLM
-        prompt_template = ChatPromptTemplate.from_messages(
-            messages=[
-                ("system", system_template_message),
-                ("user", complete_user_template_message),
-            ]
-        )
-        chain = prompt_template | llm | SimpleJsonOutputParser()
-
-        # Crear el input para el modelo
-        prompt_input = {
-            "bibliography": bibliography_text,
-            "sample_questions": sample_questions_text,
-            "question_quantity": num_questions,
-            "question_type": question_type,
-            "directness": directness,
-            "topic": topic,
-        }
-
         questions_json = chain.invoke(prompt_input)
-        questions = parse_question_jsons(questions_json, question_type)
+        questions = parse_question_jsons(questions_json.questions_answers)
     except Exception as e:
         st.error(f"Error al generar las preguntas: {e}")
         st.text("Intentalo de nuevo.")
@@ -308,12 +367,12 @@ if (
 
 # Mostrar las preguntas generadas
 if st.session_state.questions_generated:
-    st.markdown("### Preguntas generadas:")
+    st.markdown("## Preguntas generadas:")
+    st.markdown(" ")
 
     for idx, question in enumerate(st.session_state.questions_generated):
         col1, col2 = st.columns([0.5, 4])
         with col1:
-            # Botón para seleccionar la pregunta
             st.button(
                 "Agregar",
                 key=f"select_{idx}",
@@ -321,11 +380,13 @@ if st.session_state.questions_generated:
                 args=(question,),
             )
         with col2:
-            show_card_question(question)
+            show_card_question(question, idx, "generated")
+        st.markdown("---")  # Línea divisoria sutil
 
 # Mostrar las preguntas seleccionadas
 if st.session_state.questions_selected:
-    st.markdown("### Preguntas seleccionadas:")
+    st.markdown("## Preguntas seleccionadas:")
+    st.markdown(" ")
 
     for idx, question in enumerate(st.session_state.questions_selected):
         col1, col2 = st.columns([0.5, 4])
@@ -337,13 +398,14 @@ if st.session_state.questions_selected:
                 args=(question,),
             )
         with col2:
-            show_card_question(question)
+            show_card_question(question, idx, "selected")
+        st.markdown("---")  # Línea divisoria sutil
 
 # Un solo botón para generar y descargar el PDF
 if st.session_state.questions_selected:
     st.download_button(
-        label="Descargar PDF",
-        data=markdown_test_to_pdf(st.session_state.questions_selected, topic),
+        label="Descargar Pauta",
+        data=convert_test_to_pdf(st.session_state.questions_selected, topic),
         file_name=f"Prueba de {topic}.pdf",
         mime="application/pdf",
     )
