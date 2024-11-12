@@ -1,9 +1,7 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-import PyPDF2
-from markdown_pdf import MarkdownPdf, Section
-from io import BytesIO
+from utils.pdf_utils import extract_text_from_pdf, convert_test_to_pdf
 from pydantic import BaseModel
 from typing import List
 
@@ -122,16 +120,6 @@ Ejemplo:
     "respuesta_2": "Verdadero",
 }}
 """
-
-
-# Función para leer archivos PDF
-@st.cache_data
-def read_pdf(file):
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text()
-    return text
 
 
 # Función extraer preguntas y respuestas
@@ -285,40 +273,6 @@ def delete_question(question):
     st.session_state.questions_selected.remove(question)
 
 
-# Funciones para generar el texto Markdown y PDF
-def markdown_question_text(question):
-    question_title = f"### {question['pregunta']}"
-    question_answer = f"Respuesta: {question['respuesta']}"
-    if "alternativas" in question:
-        alternatives = [
-            f"Opción {chr(65+i)}: {alt}"
-            for i, alt in enumerate(question["alternativas"])
-        ]
-        return "\n".join([question_title, question_answer] + alternatives)
-    return "\n\n".join([question_title, question_answer])
-
-
-def markdown_test_text(selected_questions, topic):
-    title = f"# Prueba sobre {topic}"
-    questions = []
-    for idx, question in enumerate(selected_questions):
-        question_title = f"### Pregunta {idx + 1}"
-        question_text = markdown_question_text(question)
-        questions.extend([question_title, question_text])
-    return "\n".join([title] + questions)
-
-
-def markdown_test_to_pdf(selected_questions, topic):
-    markdown_content = markdown_test_text(selected_questions, topic)
-    pdf = MarkdownPdf()
-    section = Section(markdown_content, toc=False)
-    pdf.add_section(section)
-    pdf_output = BytesIO()
-    pdf.save(pdf_output)
-    pdf_output.seek(0)
-    return pdf_output
-
-
 # Iniciar variables de estado
 if "questions_generated" not in st.session_state:
     st.session_state.questions_generated = []
@@ -356,10 +310,10 @@ bibliography_text = ""
 sample_questions_text = ""
 
 if uploaded_bibliography:
-    bibliography_text = read_pdf(uploaded_bibliography)
+    bibliography_text = extract_text_from_pdf(uploaded_bibliography)
 
 if uploaded_sample_questions:
-    sample_questions_text = read_pdf(uploaded_sample_questions)
+    sample_questions_text = extract_text_from_pdf(uploaded_sample_questions)
 
 if uploaded_bibliography and uploaded_sample_questions:
     st.success("Archivos cargados correctamente.")
@@ -461,7 +415,7 @@ if st.session_state.questions_selected:
 if st.session_state.questions_selected:
     st.download_button(
         label="Descargar Pauta",
-        data=markdown_test_to_pdf(st.session_state.questions_selected, topic),
+        data=convert_test_to_pdf(st.session_state.questions_selected, topic),
         file_name=f"Prueba de {topic}.pdf",
         mime="application/pdf",
     )
