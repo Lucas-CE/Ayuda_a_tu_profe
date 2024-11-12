@@ -19,7 +19,6 @@ api_key = os.getenv("OPENAI_API_KEY")
 # Configuración del modelo LLM con OpenAI
 llm = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
 
-
 # Templates para el prompt del modelo
 system_template_message = """
 Eres un experto en educación. Tu tarea es reorganizar un cronograma de curso dado, considerando:
@@ -31,6 +30,8 @@ Eres un experto en educación. Tu tarea es reorganizar un cronograma de curso da
     - Elimina únicamente los contenidos menos importantes.
     - No se deben mezclar contenidos de distintas unidades en una misma semana.
 4. Toda la materia faltante debe ajustarse al tiempo restante disponible, distribuyéndola de manera equitativa semana por semana.
+5. Asegúrate de que cada contenido incluya el identificador de unidad correspondiente (por ejemplo: Unidad 4.1).
+6. Al final de tu respuesta, lista las subunidades que no fueron incluidas en el cronograma debido a falta de tiempo o relevancia.
 """
 
 user_template_message = """
@@ -78,7 +79,7 @@ semanas_disponibles = st.number_input(
 combinar_unidades = st.checkbox("¿Permitir combinar unidades relacionadas?", value=True)
 
 # Generar cronograma si se ha cargado un archivo PDF
-if archivo_pdf and st.button("Generar Cronograma Ajustado"):
+if archivo_pdf and st.button("Generar Cronograma Ajustado", key="generar_cronograma"):
     with st.spinner("Generando cronograma..."):
         programa_texto = extract_text_from_pdf(archivo_pdf)
 
@@ -99,8 +100,18 @@ if archivo_pdf and st.button("Generar Cronograma Ajustado"):
 
         # Invocar el modelo para generar el cronograma
         respuesta_generada = chain.invoke(template_prompt_input)
+
+        # Identificar subunidades no incluidas
+        unidades_faltantes_lista = [unidad.strip() for unidad in unidades_faltantes.split(",")]
+        incluidas = [unidad for unidad in unidades_faltantes_lista if unidad in respuesta_generada]
+        no_incluidas = [unidad for unidad in unidades_faltantes_lista if unidad not in respuesta_generada]
+
+        # Mostrar resultados
         st.success("Cronograma generado exitosamente:")
-        st.text_area("Cronograma Ajustado Semana por Semana", respuesta_generada, height=400)
+        st.markdown("Cronograma Ajustado Semana por Semana", respuesta_generada)
+
+        if no_incluidas:
+            st.warning(f"Subunidades no incluidas: {', '.join(no_incluidas)}")
 
 # Información adicional
 st.info("Esta aplicación utiliza LangChain y la API de OpenAI para reorganizar el cronograma del curso en base a las opciones seleccionadas.")
