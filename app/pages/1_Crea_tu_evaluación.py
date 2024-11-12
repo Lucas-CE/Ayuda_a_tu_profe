@@ -2,18 +2,8 @@ import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from utils.pdf_utils import extract_text_from_pdf, convert_test_to_pdf
-from pydantic import BaseModel
 from typing import List
-
-
-class QuestionAnswer(BaseModel):
-    pregunta: str
-    respuesta: str
-
-
-class QuestionAnswerList(BaseModel):
-    questions_answers: List[QuestionAnswer]
-
+from models.question import QuestionAnswer, QuestionAnswerList
 
 # Configuración de la página
 st.set_page_config(
