@@ -2,6 +2,12 @@ import PyPDF2
 from io import BytesIO
 from markdown_pdf import MarkdownPdf, Section
 import streamlit as st
+from models.question import (
+    DevelopmentQuestion,
+    MultipleChoiceQuestion,
+    TrueFalseQuestion,
+)
+from typing import Union
 
 
 @st.cache_data
@@ -24,7 +30,9 @@ def extract_text_from_pdf(file: BytesIO) -> str:
     return " ".join(page.extract_text() for page in pdf_reader.pages)
 
 
-def format_question_to_markdown(question: dict) -> str:
+def format_question_to_markdown(
+    question: Union[DevelopmentQuestion, MultipleChoiceQuestion, TrueFalseQuestion]
+) -> str:
     """
     Genera el texto Markdown para una pregunta.
 
@@ -47,12 +55,11 @@ def format_question_to_markdown(question: dict) -> str:
         Opción C: Madrid
         Opción D: Roma
     """
-    question_title = f"### {question['pregunta']}"
-    question_answer = f"Respuesta: {question['respuesta']}"
-    if "alternativas" in question:
+    question_title = f"### {question.pregunta}"
+    question_answer = f"Respuesta: {question.respuesta}"
+    if isinstance(question, MultipleChoiceQuestion):
         alternatives = [
-            f"Opción {chr(65+i)}: {alt}"
-            for i, alt in enumerate(question["alternativas"])
+            f"Opción {chr(65+i)}: {alt}" for i, alt in enumerate(question.alternativas)
         ]
         return "\n".join([question_title, question_answer] + alternatives)
     return "\n\n".join([question_title, question_answer])
