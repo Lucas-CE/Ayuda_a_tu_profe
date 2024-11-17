@@ -23,6 +23,7 @@ llm = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
 system_template_message = """
 Eres un experto en educación. Tu tarea es reorganizar un cronograma de curso dado, considerando:
 1. Las unidades faltantes y el tiempo restante disponible.
+1.5. No puedes poner en tu respuesta una unidad que no fue mencionada en las faltantes
 2. Si la opción de combinar unidades está activada:
     - Elimina los contenidos menos importantes.
     - Combina en una misma semana los contenidos de distintas unidades que tengan sinergia entre sí.
