@@ -2,12 +2,9 @@ from pydantic import BaseModel, Field
 from typing import List
 import streamlit as st
 from langchain_openai import ChatOpenAI
-import dotenv
-import os
 
 # Configurar OpenAI
-dotenv.load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 
 class ReferenciaBibliografica(BaseModel):
