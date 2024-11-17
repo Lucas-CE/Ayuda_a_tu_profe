@@ -30,7 +30,11 @@ if "editing_section" not in st.session_state:
 @st.cache_resource
 def load_model():
     api_key = st.secrets["OPENAI_API_KEY"]
-    model = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini", temperature=1)
+    model = ChatOpenAI(
+        openai_api_key=api_key,
+        model="gpt-4o-mini",
+        temperature=1.5,
+    )
     structured_llm = model.with_structured_output(QuestionList)
     return structured_llm
 
