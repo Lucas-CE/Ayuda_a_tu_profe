@@ -7,3 +7,5 @@ fpdf
 PyPDF2
 markdown-pdf
 pydantic
+markdown
+xhtml2pdf
