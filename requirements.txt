@@ -1,11 +1,12 @@
 pandas
 streamlit
 numpy
-langchain
-langchain-openai
+langchain==0.2.15
+langchain-core==0.2.37
+langchain-openai==0.1.23
 fpdf
 PyPDF2
 markdown-pdf
-pydantic
+pydantic==2.8.0
 markdown
 xhtml2pdf
