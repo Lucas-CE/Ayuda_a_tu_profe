@@ -23,6 +23,7 @@ llm = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
 system_template_message = """
 Eres un experto en educación. Tu tarea es reorganizar un cronograma de curso dado, considerando:
 1. Las unidades faltantes y el tiempo restante disponible.
+1.5. No puedes poner en tu respuesta una unidad que no fue mencionada en las faltantes
 2. Si la opción de combinar unidades está activada:
     - Elimina los contenidos menos importantes.
     - Combina en una misma semana los contenidos de distintas unidades que tengan sinergia entre sí.
@@ -59,6 +60,7 @@ chain = prompt_template | llm | StrOutputParser()
 
 # Interfaz de usuario con Streamlit
 st.markdown("# Reestructuración de Cronograma 📅")
+st.write("Esta herramienta permite reorganizar un cronograma de curso basado en las semanas disponibles restantes. Analiza dinámicamente las unidades y subunidades faltantes a partir de la última unidad alcanzada y genera un plan ajustado priorizando los temas más importantes.")
 st.write("Sube el programa del curso en PDF, selecciona las unidades faltantes, y genera un cronograma ajustado.")
 
 # Carga del archivo PDF
@@ -107,8 +109,11 @@ if archivo_pdf and st.button("Generar Cronograma Ajustado", key="generar_cronogr
         no_incluidas = [unidad for unidad in unidades_faltantes_lista if unidad not in respuesta_generada]
 
         # Mostrar resultados
+        # Mostrar resultados
         st.success("Cronograma generado exitosamente:")
-        st.markdown("Cronograma Ajustado Semana por Semana", respuesta_generada)
+        st.markdown("### Cronograma Ajustado Semana por Semana")
+        st.write(respuesta_generada)
+    
 
         if no_incluidas:
             st.warning(f"Subunidades no incluidas: {', '.join(no_incluidas)}")
