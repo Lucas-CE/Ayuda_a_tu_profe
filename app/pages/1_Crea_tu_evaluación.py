@@ -263,15 +263,22 @@ st.title("Generador de Evaluaciones 📝")
 topic = st.text_input("Ingresa el tema de la evaluación")
 
 num_questions = st.number_input(
-    "Número de preguntas", min_value=1, max_value=10, step=1
+    "¿Cuántas preguntas quieres generar? (Entre 1 y 20)",
+    min_value=1,
+    max_value=20,
+    step=1,
 )
 question_type = st.selectbox(
-    "Tipo de preguntas", ["Alternativas", "Desarrollo", "Verdadero y Falso"]
+    "¿Qué tipo de preguntas quieres generar?",
+    ["Alternativas", "Desarrollo", "Verdadero y Falso"],
 )
 
-uploaded_bibliography = st.file_uploader("Sube la bibliografía (PDF)", type=["pdf"])
+uploaded_bibliography = st.file_uploader(
+    "Sube una clase en la que quieras basar las preguntas", type=["pdf"]
+)
 uploaded_sample_questions = st.file_uploader(
-    "Sube preguntas anteriores (PDF)", type=["pdf"]
+    "Sube preguntas de otra prueba que hayas realizado en el curso",
+    type=["pdf"],
 )
 
 difficulty = st.selectbox(
@@ -279,7 +286,9 @@ difficulty = st.selectbox(
     ["Fácil", "Intermedio", "Difícil"],
 )
 
-extra_comments = st.text_area("Comentarios adicionales")
+extra_comments = st.text_area(
+    "Comentarios adicionales (cualquier especificación acerca de las preguntas a crear)"
+)
 
 # Leer la bibliografía y preguntas tipo subidas
 bibliography_text = ""
@@ -296,7 +305,7 @@ if uploaded_bibliography and uploaded_sample_questions:
 
 # Generar preguntas
 if (
-    st.button("Generar preguntas")
+    st.button("Generar preguntas nuevas")
     and uploaded_bibliography
     and uploaded_sample_questions
     and topic
