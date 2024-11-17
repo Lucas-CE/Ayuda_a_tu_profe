@@ -8,6 +8,10 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 
 class ReferenciaBibliografica(BaseModel):
+    """
+    Clase para representar una referencia bibliográfica académica.
+    """
+
     titulo: str = Field(description="Título exacto del libro o publicación")
     autores: str = Field(description="Nombre(s) del autor o autores")
     anio: str = Field(description="Año de publicación")
@@ -15,6 +19,10 @@ class ReferenciaBibliografica(BaseModel):
 
 
 class ListaReferencias(BaseModel):
+    """
+    Clase para representar una lista de referencias bibliográficas académicas.
+    """
+
     referencias: List[ReferenciaBibliografica] = Field(
         description="Lista de referencias bibliográficas académicas"
     )
