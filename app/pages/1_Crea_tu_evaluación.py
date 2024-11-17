@@ -219,7 +219,7 @@ def show_card_question(
                 key=f"edit_answer_{section}_{idx}",
             )
 
-            if isinstance(question_answer, MultipleChoiceQuestion):
+            if type(question_answer).__name__ == "MultipleChoiceQuestion":
                 st.text_input(
                     "Alternativas (separadas por comas)",
                     value=", ".join(question_answer.alternativas),
@@ -227,10 +227,10 @@ def show_card_question(
                 )
         else:
             st.markdown(f"**Respuesta:** {question_answer.respuesta}")
-            if isinstance(question_answer, MultipleChoiceQuestion):
-                st.markdown(
-                    f"**Alternativas:** {', '.join(question_answer.alternativas)}"
-                )
+            if type(question_answer).__name__ == "MultipleChoiceQuestion":
+                st.markdown("**Alternativas:**")
+                for alternative in question_answer.alternativas:
+                    st.markdown(f"- {alternative}")
 
 
 # Funciones para seleccionar y eliminar preguntas

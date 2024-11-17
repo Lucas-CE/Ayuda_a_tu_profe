@@ -57,11 +57,11 @@ def format_question_to_markdown(
     """
     question_title = f"### {question.pregunta}"
     question_answer = f"Respuesta: {question.respuesta}"
-    if isinstance(question, MultipleChoiceQuestion):
+    if type(question).__name__ == "MultipleChoiceQuestion":
         alternatives = [
             f"Opción {chr(65+i)}: {alt}" for i, alt in enumerate(question.alternativas)
         ]
-        return "\n".join([question_title, question_answer] + alternatives)
+        return "\n\n".join([question_title, question_answer] + alternatives)
     return "\n\n".join([question_title, question_answer])
 
 
