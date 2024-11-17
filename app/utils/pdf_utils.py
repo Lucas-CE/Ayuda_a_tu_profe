@@ -1,6 +1,7 @@
 import PyPDF2
-from io import BytesIO
-from markdown_pdf import MarkdownPdf, Section
+from io import BytesIO, StringIO
+import markdown
+from xhtml2pdf import pisa
 import streamlit as st
 from models.question import (
     DevelopmentQuestion,
@@ -99,13 +100,14 @@ def generate_test_markdown(selected_questions: list, topic: str) -> str:
 
 def convert_test_to_pdf(selected_questions: list, topic: str) -> BytesIO:
     """
-    Genera un archivo PDF a partir del texto Markdown de una prueba.
+    Genera un archivo PDF a partir del texto Markdown de una prueba,
+    aplicando estilos personalizados para mejorar la presentación visual.
 
     Args:
         selected_questions (list): Lista de preguntas seleccionadas.
         topic (str): Tema de la prueba.
     Returns:
-        BytesIO: Archivo PDF en formato BytesIO.
+        BytesIO: Archivo PDF en formato BytesIO con estilos aplicados.
 
     Example:
         >>> preguntas = [
@@ -119,10 +121,43 @@ def convert_test_to_pdf(selected_questions: list, topic: str) -> BytesIO:
         ...     f.write(pdf_bytes.getvalue())
     """
     markdown_content = generate_test_markdown(selected_questions, topic)
-    pdf = MarkdownPdf()
-    section = Section(markdown_content, toc=False)
-    pdf.add_section(section)
+    html_content = markdown.markdown(markdown_content)
+
+    # Definir estilos CSS básicos
+    css_styles = """
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                margin: 1cm;
+            }
+            h1 {
+                font-size: 24px;
+                color: #2c3e50;
+                margin-bottom: 20px;
+            }
+            h3 {
+                font-size: 18px;
+                color: #34495e;
+                margin-top: 15px;
+                margin-bottom: 10px;
+            }
+            p {
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+        </style>
+    """
+
+    # Combinar estilos con el contenido HTML
+    html_with_styles = f"""
+        <html>
+            <head>{css_styles}</head>
+            <body>{html_content}</body>
+        </html>
+    """
+
     pdf_output = BytesIO()
-    pdf.save(pdf_output)
+    pisa.CreatePDF(StringIO(html_with_styles), dest=pdf_output)
     pdf_output.seek(0)
     return pdf_output
