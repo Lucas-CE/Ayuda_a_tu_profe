@@ -1,20 +1,22 @@
-import streamlit as st 
+import streamlit as st
+import markdown
+import io
+from xhtml2pdf import pisa
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import SimpleJsonOutputParser
 import PyPDF2
-from fpdf import FPDF
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Planificador de Contenidos",
+    page_title="Actualización del Programa",
     page_icon="📚",
 )
 
+# Cargar variables de entorno
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 # Inicializar LLM
-llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model="gpt-4o-mini", temperature=0.7)
+llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model="gpt-4o-mini")
+
 
 # Función para leer archivos PDF
 def read_pdf(file):
@@ -23,6 +25,7 @@ def read_pdf(file):
     for page_num in range(len(pdf_reader.pages)):
         text += pdf_reader.pages[page_num].extract_text()
     return text
+
 
 # Función para crear un prompt más estructurado
 def generar_prompt(programa_curso, comentarios_profesor, materia):
@@ -41,38 +44,36 @@ def generar_prompt(programa_curso, comentarios_profesor, materia):
     - Estrategias de evaluación adecuadas para los cambios
     - Resultados de aprendizaje esperados
     - Bibliografía adicional (si es necesario)
+    
+    Además, ten en consideración que la duración del curso no debe superar 15 semanas.
     """
     return prompt
 
-# Función para limpiar la respuesta del modelo
-def limpiar_respuesta(respuesta):
-    # Acceder al contenido de la respuesta de AIMessage
-    contenido = respuesta.content
-    # Eliminar metadatos no deseados
-    inicio = contenido.find("Actualización del curso:")
-    if inicio != -1:
-        respuesta_limpia = contenido[inicio:]  # Mantener solo desde la sección relevante
-        return respuesta_limpia.replace("\\n", "\n").strip()  # Formatear y limpiar saltos de línea
-    return contenido
 
-# Función para generar PDF
-def generar_pdf(texto, nombre_archivo):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, texto)
-    pdf.output(nombre_archivo)
-    return nombre_archivo
+# Función para convertir Markdown a HTML
+def convert_markdown_to_html(markdown_text):
+    return markdown.markdown(markdown_text)
+
+
+# Función para convertir HTML a PDF y retornar un archivo en memoria
+def convert_html_to_pdf_memory(source_html):
+    pdf_output = io.BytesIO()
+    pisa_status = pisa.CreatePDF(io.StringIO(source_html), dest=pdf_output)
+    pdf_output.seek(0)
+    return pdf_output if not pisa_status.err else None
+
 
 # Interfaz de Streamlit
-st.markdown("# Herramienta de Planificación y Actualización Curricular")
+st.markdown("# Herramienta de Actualización Curricular")
 
 # Input de los parámetros
 materia = st.text_input("Ingresa el nombre del curso")
 uploaded_program = st.file_uploader("Sube el programa del curso (PDF)", type=["pdf"])
 
 # Espacio para que el profesor ingrese sus ideas sobre los cambios
-comentarios_profesor = st.text_area("Ingresa ideas o comentarios sobre los cambios que deseas realizar en el curso:")
+comentarios_profesor = st.text_area(
+    "Ingresa ideas o comentarios sobre los cambios que deseas realizar en el curso:"
+)
 
 # Leer archivo PDF
 program_text = ""
@@ -81,7 +82,7 @@ if uploaded_program:
     program_text = read_pdf(uploaded_program)
     st.success("Programa cargado correctamente.")
 
-# Generar la planificación
+# Generación del PDF
 if st.button("Generar Planificación"):
     if program_text:
         # Crear el prompt para el modelo
@@ -90,21 +91,26 @@ if st.button("Generar Planificación"):
         # Llamar al modelo con el prompt
         response = llm(prompt)
 
-        # Limpiar la respuesta para quitar los metadatos innecesarios
-        respuesta_limpia = limpiar_respuesta(response)
+        # Convertir la respuesta a HTML
+        html_content = convert_markdown_to_html(response.content)
 
         # Mostrar el resultado generado
         st.markdown("### Planificación sugerida:")
-        st.write(respuesta_limpia)
+        st.write(response.content)
 
-        # Generar el PDF
-        nombre_pdf = "planificacion_actualizacion_curso.pdf"
-        generar_pdf(respuesta_limpia, nombre_pdf)
-        
-        # Botón para descargar el PDF
-        with open(nombre_pdf, "rb") as pdf_file:
-            st.download_button(label="Descargar Planificación en PDF", data=pdf_file, file_name=nombre_pdf)
-        
+        # Generar el PDF desde HTML en memoria
+        pdf_output = convert_html_to_pdf_memory(html_content)
+
+        if pdf_output:
+            # Botón para descargar el PDF
+            st.download_button(
+                label="Descargar Planificación en PDF",
+                data=pdf_output,
+                file_name="planificacion_actualizacion_curso.pdf",
+                mime="application/pdf",
+            )
+        else:
+            st.error("Error al generar el PDF.")
+
     else:
         st.error("Por favor, sube el programa del curso.")
-

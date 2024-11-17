@@ -1,28 +1,38 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import SimpleJsonOutputParser
-import PyPDF2
-from markdown_pdf import MarkdownPdf, Section
-from io import BytesIO
-
-# COSAS A MEJORAR
-# - Agregar métodos de feedback para preguntas generadas
-# - Desarrollo: existen preguntas de desarrollo y otras aplicadas como calculos
-# - Agregar parámetro de cuánto tiempo se tiene para responder cada pregunta
-# - Agregar espacio para agregar comentarios a la generación de preguntas
+from utils.pdf_utils import extract_text_from_pdf, convert_test_to_pdf
+from models.question import (
+    QuestionList,
+    DevelopmentQuestion,
+    MultipleChoiceQuestion,
+    TrueFalseQuestion,
+)
+from typing import Union
 
 # Configuración de la página
 st.set_page_config(
     page_title="Generador de Evaluaciones", page_icon="📝", layout="wide"
 )
 
+# Inicializar estados para edición
+if "editing_question" not in st.session_state:
+    st.session_state.editing_question = None
+if "editing_answer" not in st.session_state:
+    st.session_state.editing_answer = None
+if "editing_alternatives" not in st.session_state:
+    st.session_state.editing_alternatives = None
+if "editing_section" not in st.session_state:
+    st.session_state.editing_section = None
+
 
 # Cargar variables de entorno y configurar el modelo
 @st.cache_resource
 def load_model():
     api_key = st.secrets["OPENAI_API_KEY"]
-    return ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini")
+    model = ChatOpenAI(openai_api_key=api_key, model="gpt-4o-mini", temperature=1)
+    structured_llm = model.with_structured_output(QuestionList)
+    return structured_llm
 
 
 llm = load_model()
@@ -30,87 +40,16 @@ llm = load_model()
 # Plantilla para el sistema
 system_template_message = """
 Eres un profesor experto en crear evaluaciones de la materia {topic}.
-"""
 
-user_template_message = """
-Basado en tu conocimiento y en la siguiente bibliografía:
+Basado en tu conocimiento y en la bibliografía:
 {bibliography}
 
 en las siguientes preguntas realizadas anteriormente:
 {sample_questions}
 
-Crea {question_quantity} preguntas de tipo {question_type}
-sobre el tema {topic}, y que las preguntas tengan dificultad {difficulty}
-a partir de la bibliografía.
-"""
+tienes que crear una evaluación según las especificaciones dadas
+por el profesor.
 
-output_desarrollo_template = """
-El output debe ser un objeto JSON con las llaves
-- pregunta_i: la pregunta generada
-- bibliografia_i: la sección relevante de la bibliografía
-- respuesta_i: la respuesta basada en la bibliografía
-
-Ejemplo:
-{{
-    "pregunta_1": "¿Cuál es la capital de Francia?",
-    "bibliografia_1": "la capital de Francia es París",
-    "respuesta_1": "París",
-    "pregunta_2": "¿Cuál es la capital de España?",
-    "bibliografia_2": "la capital de España es Madrid",
-    "respuesta_2": "Madrid",
-}}
-"""
-
-output_alternativas_template = """
-El output debe ser un objeto JSON con las llaves
-- pregunta_i: la pregunta generada
-- bibliografia_i: la sección relevante de la bibliografía
-- respuesta_i: la respuesta basada en la bibliografía
-- alternativas_i: las alternativas de respuesta
-
-Ejemplo:
-{{
-    "pregunta_1": "¿Cuál es la capital de Francia?",
-    "bibliografia_1": "la capital de Francia es París",
-    "respuesta_1": "París",
-    "alternativas_1": ["París", "Madrid", "Londres", "Berlín"],
-    "pregunta_2": "¿Cuál es la capital de España?",
-    "bibliografia_2": "la capital de España es Madrid",
-    "respuesta_2": "Madrid",
-    "alternativas_2": ["París", "Madrid", "Londres", "Berlín"],
-}}
-"""
-
-output_verdadero_falso_template = """
-El output debe ser un objeto JSON con las llaves
-- pregunta_i: la pregunta generada
-- bibliografia_i: la sección relevante de la bibliografía
-- respuesta_i: la respuesta basada en la bibliografía
-
-Ejemplo:
-{{
-    "pregunta_1": "¿La capital de Francia es París?",
-    "bibliografia_1": "la capital de Francia es París",
-    "respuesta_1": "Verdadero",
-    "pregunta_2": "¿La capital de España es Madrid?",
-    "bibliografia_2": "la capital de España es Madrid",
-    "respuesta_2": "Verdadero",
-}}
-"""
-
-
-start_feedback_questions_template = """
-Para crear las preguntas, considera que:
-"""
-
-liked_template_question = """
-- Me gustan las siguientes preguntas:
-{questions_liked}
-"""
-
-disliked_template_question = """
-- No me gustan las siguientes preguntas:
-{questions_disliked}
 """
 
 comentarios_adicionales = """
@@ -118,60 +57,180 @@ Considera estos comentarios adicionales al crear las preguntas:
 {comments}
 """
 
+user_template_message = """
+Crea {question_quantity} preguntas de tipo {question_type}
+sobre el tema {topic} basandote en la bibliografía.
+Las preguntas deben tener dificultad {difficulty}.
+"""
 
-# Función para leer archivos PDF
-@st.cache_data
-def read_pdf(file):
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text()
-    return text
-
-
-# Función para analizar las preguntas JSON
-def parse_question_jsons(json, type_question):
-    num_questions = len(json) // (4 if type_question == "Alternativas" else 3)
-    questions = []
-    for i in range(num_questions):
-        question = {
-            "pregunta": json[f"pregunta_{i + 1}"],
-            "bibliografia": json[f"bibliografia_{i + 1}"],
-            "respuesta": json[f"respuesta_{i + 1}"],
-        }
-        if type_question == "Alternativas":
-            question["alternativas"] = json[f"alternativas_{i + 1}"]
-        questions.append(question)
-    return questions
-
-
-# Función para generar preguntas
-@st.cache_data
-def generate_questions(prompt_input, question_type):
-    output_template = {
-        "Desarrollo": output_desarrollo_template,
-        "Alternativas": output_alternativas_template,
-        "Verdadero y Falso": output_verdadero_falso_template,
-    }[question_type]
-
-    prompt_template = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_template_message),
-            ("user", user_template_message + output_template),
+output_desarrollo_template = """
+Genera preguntas de desarrollo.
+El output debe ser un objeto JSON con la siguiente estructura:
+{{
+    "list_questions_answers": {{
+        "questions_answers": [
+            {{"pregunta": "¿Cuál es la capital de Francia?", "respuesta": "París"}},
+            {{"pregunta": "Explica el proceso de fotosíntesis", "respuesta": "La fotosíntesis es..."}}
         ]
+    }}
+}}
+"""
+
+output_alternativas_template = """
+Genera preguntas de alternativas.
+El output debe ser un objeto JSON con la siguiente estructura:
+{{
+    "list_questions_answers": {{
+        "questions_answers": [
+            {{
+                "pregunta": "¿Cuál es la capital de Francia?",
+                "respuesta": "París",
+                "alternativas": ["París", "Londres", "Berlín", "Madrid", "Roma"]
+            }}
+        ]
+    }}
+}}
+"""
+
+output_verdadero_falso_template = """
+Genera preguntas de verdadero o falso.
+El output debe ser un objeto JSON con la siguiente estructura:
+{{
+    "list_questions_answers": {{
+        "questions_answers": [
+            {{"pregunta": "París es la capital de Francia", "respuesta": "Verdadero"}},
+            {{"pregunta": "Londres es la capital de Francia", "respuesta": "Falso"}}
+        ]
+    }}
+}}
+"""
+
+
+# Función extraer preguntas y respuestas
+def parse_question_jsons(questions_answers_list: QuestionList):
+    return questions_answers_list.list_questions_answers.questions_answers
+
+
+def toggle_edit_mode(question_idx, section):
+    collection = (
+        st.session_state.questions_selected
+        if section == "selected"
+        else st.session_state.questions_generated
     )
-    chain = prompt_template | llm | SimpleJsonOutputParser()
+    question_answer: Union[
+        DevelopmentQuestion, MultipleChoiceQuestion, TrueFalseQuestion
+    ] = collection[question_idx]
 
-    questions_json = chain.invoke(prompt_input)
-    return parse_question_jsons(questions_json, question_type)
+    if (
+        st.session_state.editing_question == question_idx
+        and st.session_state.editing_section == section
+    ):
+        st.session_state.editing_question = None
+        st.session_state.editing_answer = None
+        st.session_state.editing_alternatives = None
+        st.session_state.editing_section = None
+    else:
+        st.session_state.editing_question = question_idx
+        st.session_state.editing_answer = question_answer.respuesta
+        st.session_state.editing_section = section
+        if isinstance(question_answer, MultipleChoiceQuestion):
+            st.session_state.editing_alternatives = ", ".join(
+                question_answer.alternativas
+            )
 
 
-def show_card_question(question):
-    with st.expander(f"**{question['pregunta']}**"):
-        st.write(f"Bibliografía: {question['bibliografia']}")
-        st.write(f"Respuesta: {question['respuesta']}")
-        if "alternativas" in question:
-            st.write(f"Alternativas: {', '.join(question['alternativas'])}")
+def save_edits(question_idx, section):
+    collection = (
+        st.session_state.questions_selected
+        if section == "selected"
+        else st.session_state.questions_generated
+    )
+    question = collection[question_idx]
+
+    # Usar keys específicas para cada sección
+    question.pregunta = st.session_state.get(
+        f"edit_question_{section}_{question_idx}", question.pregunta
+    )
+    question.respuesta = st.session_state.get(
+        f"edit_answer_{section}_{question_idx}", question.respuesta
+    )
+
+    if isinstance(question, MultipleChoiceQuestion):
+        alternatives_text = st.session_state.get(
+            f"edit_alternatives_{section}_{question_idx}", ""
+        )
+        question.alternativas = [alt.strip() for alt in alternatives_text.split(",")]
+
+    st.session_state.editing_question = None
+    st.session_state.editing_answer = None
+    st.session_state.editing_alternatives = None
+    st.session_state.editing_section = None
+
+
+def show_card_question(
+    question_answer: Union[
+        DevelopmentQuestion, MultipleChoiceQuestion, TrueFalseQuestion
+    ],
+    idx: int,
+    section: str,
+):
+    is_editing = (
+        st.session_state.editing_question == idx
+        and st.session_state.editing_section == section
+    )
+
+    # Crear un contenedor con borde y padding
+    with st.container():
+        # Primera fila: Pregunta y botones
+        col1, col2, col3 = st.columns([3.4, 0.22, 0.22])
+
+        with col1:
+            if is_editing:
+                st.text_input(
+                    "Pregunta",
+                    value=question_answer.pregunta,
+                    key=f"edit_question_{section}_{idx}",
+                )
+            else:
+                st.markdown(f"**Pregunta:** {question_answer.pregunta}")
+
+        with col2:
+            st.button(
+                "✏️",
+                key=f"edit_{section}_{idx}",
+                on_click=toggle_edit_mode,
+                args=(idx, section),
+            )
+
+        with col3:
+            if is_editing:
+                st.button(
+                    "💾",
+                    key=f"save_{section}_{idx}",
+                    on_click=save_edits,
+                    args=(idx, section),
+                )
+
+        # Segunda fila: Respuesta y alternativas
+        if is_editing:
+            st.text_area(
+                "Respuesta",
+                value=question_answer.respuesta,
+                key=f"edit_answer_{section}_{idx}",
+            )
+
+            if isinstance(question_answer, MultipleChoiceQuestion):
+                st.text_input(
+                    "Alternativas (separadas por comas)",
+                    value=", ".join(question_answer.alternativas),
+                    key=f"edit_alternatives_{section}_{idx}",
+                )
+        else:
+            st.markdown(f"**Respuesta:** {question_answer.respuesta}")
+            if isinstance(question_answer, MultipleChoiceQuestion):
+                st.markdown(
+                    f"**Alternativas:** {', '.join(question_answer.alternativas)}"
+                )
 
 
 # Funciones para seleccionar y eliminar preguntas
@@ -186,70 +245,11 @@ def delete_question(question):
     st.session_state.questions_selected.remove(question)
 
 
-# Funciones para generar el texto Markdown y PDF
-def markdown_question_text(question):
-    question_title = f"### {question['pregunta']}"
-    question_bibliography = f"Bibliografía: {question['bibliografia']}"
-    question_answer = f"Respuesta: {question['respuesta']}"
-    if "alternativas" in question:
-        alternatives = [
-            f"Opción {chr(65+i)}: {alt}"
-            for i, alt in enumerate(question["alternativas"])
-        ]
-        return "\n".join(
-            [question_title, question_bibliography, question_answer] + alternatives
-        )
-    return "\n\n".join([question_title, question_bibliography, question_answer])
-
-
-def markdown_test_text(selected_questions, topic):
-    title = f"# Prueba sobre {topic}"
-    questions = []
-    for idx, question in enumerate(selected_questions):
-        question_title = f"### Pregunta {idx + 1}"
-        question_text = markdown_question_text(question)
-        questions.extend([question_title, question_text])
-    return "\n".join([title] + questions)
-
-
-def markdown_test_to_pdf(selected_questions, topic):
-    markdown_content = markdown_test_text(selected_questions, topic)
-    pdf = MarkdownPdf()
-    section = Section(markdown_content, toc=False)
-    pdf.add_section(section)
-    pdf_output = BytesIO()
-    pdf.save(pdf_output)
-    pdf_output.seek(0)
-    return pdf_output
-
-
-def handle_like_dislike(question, action):
-    # Si la card no está en el diccionario de estado, inicializamos
-    if action == "like":
-        if question in st.session_state.questions_disliked:
-            st.session_state.questions_disliked.remove(question)
-        if question in st.session_state.questions_liked:
-            st.session_state.questions_liked.remove(question)
-        else:
-            st.session_state.questions_liked.append(question)
-    elif action == "dislike":
-        if question in st.session_state.questions_liked:
-            st.session_state.questions_liked.remove(question)
-        if question in st.session_state.questions_disliked:
-            st.session_state.questions_disliked.remove(question)
-        else:
-            st.session_state.questions_disliked.append(question)
-
-
 # Iniciar variables de estado
 if "questions_generated" not in st.session_state:
     st.session_state.questions_generated = []
 if "questions_selected" not in st.session_state:
     st.session_state.questions_selected = []
-if "questions_liked" not in st.session_state:
-    st.session_state.questions_liked = []
-if "questions_disliked" not in st.session_state:
-    st.session_state.questions_disliked = []
 
 
 # Interfaz de usuario
@@ -282,10 +282,10 @@ bibliography_text = ""
 sample_questions_text = ""
 
 if uploaded_bibliography:
-    bibliography_text = read_pdf(uploaded_bibliography)
+    bibliography_text = extract_text_from_pdf(uploaded_bibliography)
 
 if uploaded_sample_questions:
-    sample_questions_text = read_pdf(uploaded_sample_questions)
+    sample_questions_text = extract_text_from_pdf(uploaded_sample_questions)
 
 if uploaded_bibliography and uploaded_sample_questions:
     st.success("Archivos cargados correctamente.")
@@ -301,42 +301,28 @@ if (
     and difficulty
 ):
     # Seleccionar el template de output
-    complete_user_template_message = user_template_message
-    feedback_questions_text = ""
-    if st.session_state.questions_liked or st.session_state.questions_disliked:
-        feedback_questions_text = start_feedback_questions_template
-    if st.session_state.questions_liked:
-        feedback_questions_text += liked_template_question.format(
-            questions_liked="\n".join(st.session_state.questions_liked)
-        )
-    if st.session_state.questions_disliked:
-        feedback_questions_text += disliked_template_question.format(
-            questions_disliked="\n".join(st.session_state.questions_disliked)
-        )
+    complete_system_template_message = system_template_message
 
-    complete_user_template_message += feedback_questions_text
-
-    if question_type == "Desarrollo":
-        complete_user_template_message += "\n" + output_desarrollo_template
-    elif question_type == "Alternativas":
-        complete_user_template_message += "\n" + output_alternativas_template
-    elif question_type == "Verdadero y Falso":
-        complete_user_template_message = "\n" + output_verdadero_falso_template
-
-    # Agragar comentarios adicionales
     if extra_comments:
-        complete_user_template_message += "\n" + comentarios_adicionales.format(
+        complete_system_template_message += "\n" + comentarios_adicionales.format(
             comments=extra_comments
         )
+
+    if question_type == "Desarrollo":
+        complete_system_template_message += "\n" + output_desarrollo_template
+    elif question_type == "Alternativas":
+        complete_system_template_message += "\n" + output_alternativas_template
+    elif question_type == "Verdadero y Falso":
+        complete_system_template_message += "\n" + output_verdadero_falso_template
 
     # Crear el prompt para LLM
     prompt_template = ChatPromptTemplate.from_messages(
         messages=[
-            ("system", system_template_message),
-            ("user", complete_user_template_message),
+            ("system", complete_system_template_message),
+            ("user", user_template_message),
         ]
     )
-    chain = prompt_template | llm | SimpleJsonOutputParser()
+    chain = prompt_template | llm
 
     # Crear el input para el modelo
     prompt_input = {
@@ -351,7 +337,7 @@ if (
     # Generar las preguntas
     try:
         questions_json = chain.invoke(prompt_input)
-        questions = parse_question_jsons(questions_json, question_type)
+        questions = parse_question_jsons(questions_json)
     except Exception as e:
         st.error(f"Error al generar las preguntas: {e}")
         st.text("Intentalo de nuevo.")
@@ -363,43 +349,26 @@ if (
 
 # Mostrar las preguntas generadas
 if st.session_state.questions_generated:
-    st.markdown("### Preguntas generadas:")
+    st.markdown("## Preguntas generadas:")
+    st.markdown(" ")
 
-    for idx, question in enumerate(st.session_state.questions_generated):
-        col1, col2, col_like, col_dislike = st.columns([0.5, 4, 0.6, 0.7])
+    for idx, question_answer in enumerate(st.session_state.questions_generated):
+        col1, col2 = st.columns([0.5, 4])
         with col1:
-            # Botón para seleccionar la pregunta
             st.button(
                 "Agregar",
                 key=f"select_{idx}",
                 on_click=select_question,
-                args=(question,),
+                args=(question_answer,),
             )
         with col2:
-            show_card_question(question)
-        # Column to give feedback about the question: like dislike
-        with col_like:
-            question_liked = question['pregunta'] in st.session_state.questions_liked
-            text_like_btn = "👍**Liked**" if question_liked else "👍Like"
-            like_btn = st.button(
-                text_like_btn,
-                key=f"like_{idx}",
-                on_click=handle_like_dislike,
-                args=(question['pregunta'], "like"),
-            )
-        with col_dislike:
-            question_disliked = question['pregunta'] in st.session_state.questions_disliked
-            text_dislike_btn = "👎**Disliked**" if question_disliked else "👎Dislike"
-            dislike_btn = st.button(
-                text_dislike_btn,
-                key=f"dislike_{idx}",
-                on_click=handle_like_dislike,
-                args=(question['pregunta'], "dislike"),
-            )
+            show_card_question(question_answer, idx, "generated")
+        st.markdown("---")  # Línea divisoria sutil
 
 # Mostrar las preguntas seleccionadas
 if st.session_state.questions_selected:
-    st.markdown("### Preguntas seleccionadas:")
+    st.markdown("## Preguntas seleccionadas:")
+    st.markdown(" ")
 
     for idx, question in enumerate(st.session_state.questions_selected):
         col1, col2 = st.columns([0.5, 4])
@@ -411,13 +380,14 @@ if st.session_state.questions_selected:
                 args=(question,),
             )
         with col2:
-            show_card_question(question)
+            show_card_question(question, idx, "selected")
+        st.markdown("---")  # Línea divisoria sutil
 
 # Un solo botón para generar y descargar el PDF
 if st.session_state.questions_selected:
     st.download_button(
-        label="Descargar PDF",
-        data=markdown_test_to_pdf(st.session_state.questions_selected, topic),
+        label="Descargar Pauta",
+        data=convert_test_to_pdf(st.session_state.questions_selected, topic),
         file_name=f"Prueba de {topic}.pdf",
         mime="application/pdf",
     )
