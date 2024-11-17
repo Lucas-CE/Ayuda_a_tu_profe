@@ -2,8 +2,6 @@ import streamlit as st
 import markdown
 import io
 from xhtml2pdf import pisa
-import dotenv
-import os
 from langchain_openai import ChatOpenAI
 import PyPDF2
 
@@ -14,7 +12,6 @@ st.set_page_config(
 )
 
 # Cargar variables de entorno
-dotenv.load_dotenv()
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 # Inicializar LLM
