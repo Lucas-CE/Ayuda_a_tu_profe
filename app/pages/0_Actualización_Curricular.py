@@ -17,6 +17,7 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 # Inicializar LLM
 llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model="gpt-4o-mini")
 
+
 # Función para leer archivos PDF
 def read_pdf(file):
     pdf_reader = PyPDF2.PdfReader(file)
@@ -24,6 +25,7 @@ def read_pdf(file):
     for page_num in range(len(pdf_reader.pages)):
         text += pdf_reader.pages[page_num].extract_text()
     return text
+
 
 # Función para crear un prompt más estructurado
 def generar_prompt(programa_curso, comentarios_profesor, materia):
@@ -47,9 +49,11 @@ def generar_prompt(programa_curso, comentarios_profesor, materia):
     """
     return prompt
 
+
 # Función para convertir Markdown a HTML
 def convert_markdown_to_html(markdown_text):
     return markdown.markdown(markdown_text)
+
 
 # Función para convertir HTML a PDF y retornar un archivo en memoria
 def convert_html_to_pdf_memory(source_html):
@@ -57,6 +61,7 @@ def convert_html_to_pdf_memory(source_html):
     pisa_status = pisa.CreatePDF(io.StringIO(source_html), dest=pdf_output)
     pdf_output.seek(0)
     return pdf_output if not pisa_status.err else None
+
 
 # Interfaz de Streamlit
 st.markdown("# Herramienta de Actualización Curricular")
@@ -66,7 +71,9 @@ materia = st.text_input("Ingresa el nombre del curso")
 uploaded_program = st.file_uploader("Sube el programa del curso (PDF)", type=["pdf"])
 
 # Espacio para que el profesor ingrese sus ideas sobre los cambios
-comentarios_profesor = st.text_area("Ingresa ideas o comentarios sobre los cambios que deseas realizar en el curso:")
+comentarios_profesor = st.text_area(
+    "Ingresa ideas o comentarios sobre los cambios que deseas realizar en el curso:"
+)
 
 # Leer archivo PDF
 program_text = ""
@@ -93,12 +100,17 @@ if st.button("Generar Planificación"):
 
         # Generar el PDF desde HTML en memoria
         pdf_output = convert_html_to_pdf_memory(html_content)
-        
+
         if pdf_output:
             # Botón para descargar el PDF
-            st.download_button(label="Descargar Planificación en PDF", data=pdf_output, file_name="planificacion_actualizacion_curso.pdf", mime="application/pdf")
+            st.download_button(
+                label="Descargar Planificación en PDF",
+                data=pdf_output,
+                file_name="planificacion_actualizacion_curso.pdf",
+                mime="application/pdf",
+            )
         else:
             st.error("Error al generar el PDF.")
-        
+
     else:
         st.error("Por favor, sube el programa del curso.")
