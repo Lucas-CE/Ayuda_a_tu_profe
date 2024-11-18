@@ -33,7 +33,7 @@ def load_model():
     model = ChatOpenAI(
         openai_api_key=api_key,
         model="gpt-4o-mini",
-        temperature=1.5,
+        temperature=1,
     )
     structured_llm = model.with_structured_output(QuestionList)
     return structured_llm
@@ -277,7 +277,7 @@ uploaded_bibliography = st.file_uploader(
     "Sube una clase en la que quieras basar las preguntas", type=["pdf"]
 )
 uploaded_sample_questions = st.file_uploader(
-    "Sube preguntas de otra prueba que hayas realizado en el curso",
+    "Sube preguntas de otra prueba que hayas realizado en el curso (opcional)",
     type=["pdf"],
 )
 
@@ -307,7 +307,6 @@ if uploaded_bibliography and uploaded_sample_questions:
 if (
     st.button("Generar preguntas nuevas")
     and uploaded_bibliography
-    and uploaded_sample_questions
     and topic
     and num_questions
     and question_type
