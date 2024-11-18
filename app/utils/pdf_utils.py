@@ -66,6 +66,28 @@ def format_question_to_markdown(
     return "\n\n".join([question_title, question_answer])
 
 
+def format_question_to_markdown_without_answers(
+    question: Union[DevelopmentQuestion, MultipleChoiceQuestion, TrueFalseQuestion]
+) -> str:
+    """
+    Genera el texto Markdown para una pregunta sin incluir la respuesta.
+
+    Args:
+        question (dict): Pregunta con estructura específica.
+    Returns:
+        str: Texto Markdown para una pregunta sin respuesta.
+    """
+    question_title = f"### {question.pregunta}"
+    if type(question).__name__ == "MultipleChoiceQuestion":
+        alternatives = [
+            f"Opción {chr(65+i)}: {alt}" for i, alt in enumerate(question.alternativas)
+        ]
+        return "\n\n".join([question_title] + alternatives)
+    if type(question).__name__ == "TrueFalseQuestion":
+        return "\n\n".join([question_title, "\n- Verdadero", "\n- Falso\n\n"])
+    return "\n\n".join([question_title, "\n\n\n\n\n"])
+
+
 def generate_test_markdown(selected_questions: list, topic: str) -> str:
     """
     Genera el texto Markdown para una prueba.
@@ -94,6 +116,19 @@ def generate_test_markdown(selected_questions: list, topic: str) -> str:
     for idx, question in enumerate(selected_questions):
         question_title = f"### Pregunta {idx + 1}"
         question_text = format_question_to_markdown(question)
+        questions.extend([question_title, question_text])
+    return "\n".join([title] + questions)
+
+
+def generate_test_markdown_without_answers(selected_questions: list, topic: str) -> str:
+    """
+    Genera el texto Markdown para una prueba sin respuestas.
+    """
+    title = f"# Prueba sobre {topic}"
+    questions = []
+    for idx, question in enumerate(selected_questions):
+        question_title = f"### Pregunta {idx + 1}"
+        question_text = format_question_to_markdown_without_answers(question)
         questions.extend([question_title, question_text])
     return "\n".join([title] + questions)
 
@@ -150,6 +185,53 @@ def convert_test_to_pdf(selected_questions: list, topic: str) -> BytesIO:
     """
 
     # Combinar estilos con el contenido HTML
+    html_with_styles = f"""
+        <html>
+            <head>{css_styles}</head>
+            <body>{html_content}</body>
+        </html>
+    """
+
+    pdf_output = BytesIO()
+    pisa.CreatePDF(StringIO(html_with_styles), dest=pdf_output)
+    pdf_output.seek(0)
+    return pdf_output
+
+
+def convert_test_to_pdf_without_answers(
+    selected_questions: list, topic: str
+) -> BytesIO:
+    """
+    Genera un archivo PDF de la prueba sin incluir las respuestas.
+    """
+    markdown_content = generate_test_markdown_without_answers(selected_questions, topic)
+    html_content = markdown.markdown(markdown_content)
+
+    css_styles = """
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                margin: 1cm;
+            }
+            h1 {
+                font-size: 24px;
+                color: #2c3e50;
+                margin-bottom: 20px;
+            }
+            h3 {
+                font-size: 18px;
+                color: #34495e;
+                margin-top: 15px;
+                margin-bottom: 10px;
+            }
+            p {
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+        </style>
+    """
+
     html_with_styles = f"""
         <html>
             <head>{css_styles}</head>

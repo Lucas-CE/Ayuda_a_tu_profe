@@ -46,12 +46,3 @@ class TrueFalseQuestionList(BaseModel):
     Clase para representar una lista de preguntas de verdadero o falso.
     """
     questions_answers: List[TrueFalseQuestion]
-
-
-class QuestionList(BaseModel):
-    """
-    Clase para representar una lista de preguntas de desarrollo, opción múltiple o verdadero o falso.
-    """
-    list_questions_answers: (
-        DevelopmentQuestionList | MultipleChoiceQuestionList | TrueFalseQuestionList
-    )

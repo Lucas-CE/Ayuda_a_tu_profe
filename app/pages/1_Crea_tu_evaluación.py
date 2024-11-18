@@ -1,9 +1,15 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from utils.pdf_utils import extract_text_from_pdf, convert_test_to_pdf
+from utils.pdf_utils import (
+    extract_text_from_pdf,
+    convert_test_to_pdf,
+    convert_test_to_pdf_without_answers,
+)
 from models.question import (
-    QuestionList,
+    DevelopmentQuestionList,
+    MultipleChoiceQuestionList,
+    TrueFalseQuestionList,
     DevelopmentQuestion,
     MultipleChoiceQuestion,
     TrueFalseQuestion,
@@ -35,8 +41,7 @@ def load_model():
         model="gpt-4o-mini",
         temperature=1,
     )
-    structured_llm = model.with_structured_output(QuestionList)
-    return structured_llm
+    return model
 
 
 llm = load_model()
@@ -111,8 +116,12 @@ El output debe ser un objeto JSON con la siguiente estructura:
 
 
 # Función extraer preguntas y respuestas
-def parse_question_jsons(questions_answers_list: QuestionList):
-    return questions_answers_list.list_questions_answers.questions_answers
+def parse_question_jsons(
+    questions_answers_list: (
+        DevelopmentQuestionList | MultipleChoiceQuestionList | TrueFalseQuestionList
+    ),
+):
+    return questions_answers_list.questions_answers
 
 
 def toggle_edit_mode(question_idx, section):
@@ -259,6 +268,21 @@ if "questions_selected" not in st.session_state:
 # Interfaz de usuario
 st.title("Generador de Evaluaciones 📝")
 
+st.markdown(
+    """
+    Esta herramienta te permite generar preguntas de evaluación para tu curso.
+
+    Recomendaciones:
+    - Al generar preguntas las puedes editar para que se ajusten a tu
+    preferencia.
+    - Si no te gustaron las preguntas generadas, puedes generarlas de nuevo,
+    y aumentar el número de preguntas.
+    - Luego de generar preguntas, puedes modificar comentarios adicionales
+    y generar nuevas preguntas para que las preguntas se ajusten mejor a tus
+    necesidades.
+    """
+)
+
 # Selección de parámetros
 topic = st.text_input("Ingresa el tema de la evaluación")
 
@@ -322,11 +346,13 @@ if (
 
     if question_type == "Desarrollo":
         complete_system_template_message += "\n" + output_desarrollo_template
+        structured_llm = llm.with_structured_output(DevelopmentQuestionList)
     elif question_type == "Alternativas":
         complete_system_template_message += "\n" + output_alternativas_template
+        structured_llm = llm.with_structured_output(MultipleChoiceQuestionList)
     elif question_type == "Verdadero y Falso":
         complete_system_template_message += "\n" + output_verdadero_falso_template
-
+        structured_llm = llm.with_structured_output(TrueFalseQuestionList)
     # Crear el prompt para LLM
     prompt_template = ChatPromptTemplate.from_messages(
         messages=[
@@ -334,7 +360,7 @@ if (
             ("user", user_template_message),
         ]
     )
-    chain = prompt_template | llm
+    chain = prompt_template | structured_llm
 
     # Crear el input para el modelo
     prompt_input = {
@@ -401,5 +427,13 @@ if st.session_state.questions_selected:
         label="Descargar Pauta",
         data=convert_test_to_pdf(st.session_state.questions_selected, topic),
         file_name=f"Prueba de {topic}.pdf",
+        mime="application/pdf",
+    )
+    st.download_button(
+        label="Descargar Pauta sin respuestas",
+        data=convert_test_to_pdf_without_answers(
+            st.session_state.questions_selected, topic
+        ),
+        file_name=f"Prueba de {topic} sin respuestas.pdf",
         mime="application/pdf",
     )
