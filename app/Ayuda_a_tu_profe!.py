@@ -7,7 +7,7 @@ st.title("Ayuda a tu profe! 🧑‍🏫")
 col1, col2 = st.columns([0.6, 2])
 
 with col1:
-    st.image("app/elprofe.jpg")
+    st.image("app/elprofe.png")
 
 with col2:
     st.markdown(
